@@ -263,8 +263,11 @@ def make_image_padder(pad_x: int, pad_y: int):
 
 def test_padding():
     import matplotlib.pyplot as plt
+    import os
 
-    ms = np.load('../../microstructures/pymks_ms_64x64.npy')
+    filename = os.path.join(os.path.dirname(__file__), '../../example_microstructures/pymks_ms_64x64_1.npy')
+    
+    ms = np.load(filename)
     ms = ms.reshape([1, *ms.shape, 1])
     padder = make_image_padder(15, 1)
 
