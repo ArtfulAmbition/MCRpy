@@ -134,3 +134,8 @@ dmypy.json
 
 # results folder
 results
+
+#pyreverse (UML diagrams)
+*.dot
+classesUML.png
+packages.png
