@@ -1,3 +1,5 @@
+import config
+
 import unittest
 
 import numpy as np
