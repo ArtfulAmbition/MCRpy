@@ -25,7 +25,7 @@ class CommonSettings:
     target_folder: str = None
     information: str = None
     logfile_name: str = 'logfile'
-    logging_level: int = logging.INFO
+    logging_level: int = logging.DEBUG
     logfile_date: bool = False
 
 @dataclass
