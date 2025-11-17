@@ -1,4 +1,3 @@
-import config
 import unittest
 import numpy as np
 import mcrpy

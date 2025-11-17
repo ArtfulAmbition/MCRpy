@@ -1,5 +1,3 @@
-import config
-
 import unittest
 import os
 from copy import deepcopy
