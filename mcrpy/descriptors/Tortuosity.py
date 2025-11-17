@@ -20,7 +20,6 @@ import tensorflow as tf
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 
-
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
 
@@ -29,9 +28,13 @@ class Tortuosity(PhaseDescriptor):
 
         @tf.function
         def compute_descriptor(microstructure: tf.Tensor) -> tf.Tensor:
-            return 0 #todo! tf.math.reduce_mean(microstructure)
+            return mean_tortuosity(microstructure)
         return compute_descriptor
 
 
 def register() -> None:
     descriptor_factory.register("Tortuosity", Tortuosity)
+
+
+def mean_tortuosity(microstructure: tf.Tensor):
+    ms = microstructure
