@@ -1,0 +1,9 @@
+damask==3.0.2
+Gooey==1.0.8.1
+matplotlib==3.10.7
+numpy==2.3.5
+pyevtk==1.6.0
+pymks==0.4.1
+scipy==1.16.3
+setuptools==80.9.0
+tensorflow==2.20.0
