@@ -37,11 +37,26 @@ class Tortuosity(PhaseDescriptor):
         phases_to_investigate : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         **kwargs) -> callable:
 
-        @tf.function
-        def DSPSM(ms,connectivity):
-            return connectivity
+        #tf.function
+        def array_to_graph(ms, phase_to_investigate:int) -> nx.Graph:
+            bool_array = ms == phase_to_investigate
+            print(bool_array)
+            print('Hallo Word')
+            print(type(ms))
+            graph = nx.Graph()
+            return nx.Graph()
 
-        @tf.function
+        #@tf.function
+        def create_graph_global(ms):
+            k = array_to_graph(ms, phase_to_investigate=0)
+            graph = 11 + connectivity
+            return graph
+
+        #@tf.function
+        def DSPSM(ms,connectivity):
+            return create_graph_global(ms) + connectivity
+
+        #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             tortuosity_val = DSPSM(ms,connectivity)
             return tortuosity_val
@@ -59,6 +74,7 @@ if __name__=="__main__":
     folder = '../../example_microstructures/' 
     minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     ms = np.load(minimal_example_ms)
+    print(f'ms type: {type(ms)}')
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
