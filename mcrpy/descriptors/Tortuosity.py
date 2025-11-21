@@ -23,35 +23,38 @@ import logging
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from numpy.typing import NDArray
-from typing import Any
+from typing import Any, Union
+import numpy as np
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
 
     @staticmethod
-    def make_singlephase_descriptor(**kwargs) -> callable:
+    def make_singlephase_descriptor(
+        a=1,
+        b=2,
+        **kwargs) -> callable:
 
         @tf.function
-        def compute_descriptor(microstructure: tf.Tensor) -> NDArray[Any]:
-            return mean_tortuosity(microstructure)
+        def compute_descriptor(microstructure: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
+            return a, b, 11
         return compute_descriptor
 
 
 def register() -> None:
     descriptor_factory.register("Tortuosity", Tortuosity)
 
+       
 
-def mean_tortuosity(ms: tf.Tensor) -> NDArray[Any]:
+if __name__=="__main__":
 
-    # ---------------------Funktion: Den kuerzesten Pfad von unten nach oben mit 'Dijkstra Algorithmus' suchen--------------
-    def calculate_shortest_path(graph, target_face_list, source_nodes):
-        '''
-        Calculation of the shortest path with the Dijkstra algorithm
-        Function written by Shihai Liu (Forschungspraktikum)
-        '''
-        try:
-            shortest_length, shortest_path = nx.multi_source_dijkstra(graph, target_face_list, source_nodes)
-            return shortest_length, shortest_path, source_nodes
-        # Situation, dass der Pfad vom Startpunkt zum Endpunkt nicht erreichbar ist, None zurückgeben.
-        except:
-            return None, None, None
+    import os
+    folder = '../../example_microstructures/' 
+    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    ms = np.load(minimal_example_ms)
+    tortuosity_descriptor = Tortuosity()
+    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+
+    a, b, c = singlephase_descriptor(ms)
+    print(c)
+
