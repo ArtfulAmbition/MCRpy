@@ -16,9 +16,14 @@
 # from __future__ import annotations
 
 import tensorflow as tf
+import networkx as nx
+
+import logging
 
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
+from numpy.typing import NDArray
+from typing import Any
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
@@ -27,7 +32,7 @@ class Tortuosity(PhaseDescriptor):
     def make_singlephase_descriptor(**kwargs) -> callable:
 
         @tf.function
-        def compute_descriptor(microstructure: tf.Tensor) -> tf.Tensor:
+        def compute_descriptor(microstructure: tf.Tensor) -> NDArray[Any]:
             return mean_tortuosity(microstructure)
         return compute_descriptor
 
@@ -36,5 +41,17 @@ def register() -> None:
     descriptor_factory.register("Tortuosity", Tortuosity)
 
 
-def mean_tortuosity(microstructure: tf.Tensor):
-    ms = microstructure
+def mean_tortuosity(ms: tf.Tensor) -> NDArray[Any]:
+
+    # ---------------------Funktion: Den kuerzesten Pfad von unten nach oben mit 'Dijkstra Algorithmus' suchen--------------
+    def calculate_shortest_path(graph, target_face_list, source_nodes):
+        '''
+        Calculation of the shortest path with the Dijkstra algorithm
+        Function written by Shihai Liu (Forschungspraktikum)
+        '''
+        try:
+            shortest_length, shortest_path = nx.multi_source_dijkstra(graph, target_face_list, source_nodes)
+            return shortest_length, shortest_path, source_nodes
+        # Situation, dass der Pfad vom Startpunkt zum Endpunkt nicht erreichbar ist, None zurückgeben.
+        except:
+            return None, None, None
