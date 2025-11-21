@@ -31,14 +31,21 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        a=1,
-        b=2,
+        connectivity : int = 6,
+        method : str = 'DSPSM',
+        directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
+        phases_to_investigate : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         **kwargs) -> callable:
 
         @tf.function
-        def compute_descriptor(microstructure: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            return a, b, 11
-        return compute_descriptor
+        def DSPSM(ms,connectivity):
+            return connectivity
+
+        @tf.function
+        def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
+            tortuosity_val = DSPSM(ms,connectivity)
+            return tortuosity_val
+        return model
 
 
 def register() -> None:
@@ -55,6 +62,6 @@ if __name__=="__main__":
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    a, b, c = singlephase_descriptor(ms)
-    print(c)
+    tort = singlephase_descriptor(ms)
+    print(tort)
 
