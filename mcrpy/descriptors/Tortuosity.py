@@ -37,29 +37,47 @@ class Tortuosity(PhaseDescriptor):
         phases_to_investigate : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         **kwargs) -> callable:
 
-        tf.function
-        def array_to_graph(ms:tf.Tensor, phase_to_investigate:int) -> nx.Graph:
-            phase_bool_array = ms == phase_to_investigate
+        #@tf.function
+        def array_to_graph(ms:Union[tf.Tensor,NDArray], phase_to_investigate:int): #-> nx.Graph:
+            
+            #TODO: make more efficient by only calculation using tf
+            if (type(ms) is tf.Tensor):
+                ms = ms.numpy()
+            coordinates = tf.where(ms == phase_to_investigate) # getting the coordinates of voxels with phase id equal to phase_to_investigate
+            coordinates_np = coordinates.numpy()
 
+            nodes = map(tuple,coordinates_np) # creating a vector of node tuples for insertion to nx.Graph()
+
+            #create nodes:
             graph = nx.Graph()
+            graph.add_nodes_from(nodes) 
 
-            coordinates = tf.where(phase_bool_array)
-            # Add nodes to the graph
-            print('coords: ')
-            print(coordinates)
-            return graph
+            #connect nodes:
+            if connectivity == 6:
+                directions = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
+            
+            graph_nodes = set(graph.nodes)  # Use a set for faster lookups
+            edges_to_add = []  # List to store edges before adding
+            
+            for node in graph.nodes:
+                x, y, z = node
+                print(x)
 
-        @tf.function
+            return 1
+        
+            
+
+        #@tf.function
         def create_graph_global(ms:tf.Tensor):
             k = array_to_graph(ms, phase_to_investigate=0)
             graph = 11 + connectivity
             return graph
 
-        @tf.function
+        # @tf.function
         def DSPSM(ms:tf.Tensor,connectivity):
             return create_graph_global(ms) + connectivity
 
-        @tf.function
+        # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             tortuosity_val = DSPSM(ms,connectivity)
             return tortuosity_val
@@ -82,5 +100,7 @@ if __name__=="__main__":
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
     tort = singlephase_descriptor(ms)
+    print('\n -----------------------------')
     print(tort)
-    print(tf.__version__)
+
+
