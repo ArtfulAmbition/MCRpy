@@ -74,7 +74,7 @@ def register() -> None:
 if __name__=="__main__":
 
     import os
-    folder = '../../example_microstructures/' 
+    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     ms = np.load(minimal_example_ms)
     print(f'ms type: {type(ms)}, size: {ms.size}')
