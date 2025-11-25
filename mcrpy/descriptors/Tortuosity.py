@@ -34,7 +34,7 @@ class Tortuosity(PhaseDescriptor):
         connectivity : int = 6,
         method : str = 'DSPSM',
         directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = 1, #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -140,8 +140,22 @@ class Tortuosity(PhaseDescriptor):
             if (not target_nodes) or (not source_nodes):
                 print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return None
-            target_node = target_nodes[0]
-            length, path = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)
+            #target_node = target_nodes[0]
+            #length, path = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)
+
+            def calculate_path_length(graph, source_nodes, target_node):
+                try:
+                    return nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0]
+                except:
+                    return None
+
+            #path_length_list = [calculate_path_length(graph, source_nodes, target_node) for target_node in target_nodes]
+            path_length_list = [length for target_node in target_nodes if (length := calculate_path_length(graph, source_nodes, target_node)) is not None]
+            #path_length_list = [nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0] for target_node in target_nodes]
+
+
+
+
             # def calculate_shortest_path_length(graph:nx.Graph, source_nodes:Union[tuple[float],list[tuple[float]]], target_node:tuple[float]):
             #     try:
             #         path = nx.multi_source_dijkstra(G=graph, source_nodes=source_nodes, target_node=target_node)[0]     
@@ -160,7 +174,7 @@ class Tortuosity(PhaseDescriptor):
 
             print(f'source.nodes_aray: {source_nodes}')
             print(f'source.target_nodes: {target_nodes}')
-            print(f'length: {length}')
+            print(f'length: {path_length_list}')
 
             return 1
 
