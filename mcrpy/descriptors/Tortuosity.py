@@ -34,52 +34,99 @@ class Tortuosity(PhaseDescriptor):
         connectivity : int = 6,
         method : str = 'DSPSM',
         directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
-        phases_to_investigate : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
+        voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
         #@tf.function
-        def array_to_graph(ms:Union[tf.Tensor,NDArray], phase_to_investigate:int): #-> nx.Graph:
-            
-            #TODO: make more efficient by only calculation using tf
+        def ms_to_graph(ms:Union[tf.Tensor,NDArray],) -> nx.Graph:
+            # ms mcirostructure
+            # phase_to_investigate integer representation of the phase for which the connectivity graph should be investigated
+            # connectivity: number of adjacent neighbors for which a connectivity should be allowed. Implemented possibilites are 6, 18 and 24
+            # voxel_dimension: the dimension (lx,ly,lz) of each considered voxel. Is needed to calculate the distance between neighbors
+
+            lx, ly, lz = voxel_dimension
+
+            #--------- create nodes: ------------------
+            #TODO: make more efficient by not switching between tf and np.ndarray
             if (type(ms) is tf.Tensor):
                 ms = ms.numpy()
-            coordinates = tf.where(ms == phase_to_investigate) # getting the coordinates of voxels with phase id equal to phase_to_investigate
+            coordinates = tf.where(ms == phase_of_interest) # getting the coordinates of voxels with phase id equal to phase_to_investigate
             coordinates_np = coordinates.numpy()
 
             nodes = map(tuple,coordinates_np) # creating a vector of node tuples for insertion to nx.Graph()
-
-            #create nodes:
+            
             graph = nx.Graph()
             graph.add_nodes_from(nodes) 
 
-            #connect nodes:
+            #--------- connect nodes: -----------------
             if connectivity == 6:
-                directions = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
-            
-            graph_nodes = set(graph.nodes)  # Use a set for faster lookups
+                directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
+
+            elif connectivity == 18:
+                directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
+                            (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
+                            (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
+                            (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)])
+                
+            elif connectivity == 26:
+                directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
+                      (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
+                      (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
+                      (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
+                      (1, 1, 1), (1, -1, 1), (-1, 1, 1), (-1, -1, 1),
+                      (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)])  
+            else:
+                raise Exception("wrong input for connectivity value. Valid inputs are 6, 18 or 26.")
+
+            graph_nodes = np.array(list(graph.nodes))  # Convert to np.array for vectorized operations
             edges_to_add = []  # List to store edges before adding
             
+            i = 0
             for node in graph.nodes:
-                x, y, z = node
-                print(x)
+                #x, y, z = node
+                neighbors = node + directions #find all neighbors by coordinates
+                valid_neighbors = neighbors[np.isin(neighbors, graph_nodes).all(axis=1)] #extract the  neighbors which are of the same phase
 
-            return 1
-        
-            
+                # calculating the distance to the neighbor:
+                normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
+                weighted_distance_vectors = normed_distance_vectors * [lx,ly,lz] # weighted vector differences between the current node to its valid neighbors 
+                distances = np.linalg.norm(weighted_distance_vectors, axis=1)
+                                
+                edges_to_add.extend([(node, tuple(valid_neighbor), {'weight': distance}) for valid_neighbor, distance in zip(valid_neighbors, distances)])
 
-        #@tf.function
-        def create_graph_global(ms:tf.Tensor):
-            k = array_to_graph(ms, phase_to_investigate=0)
-            graph = 11 + connectivity
+                # if i==0:
+                #     print(f'valid_neighbors= {valid_neighbors}')
+                #     print(f'node= {node}')
+                #     print(f'distance= {distances}')
+                #     print(f'edges_to_add= {edges_to_add}')
+                #     i+=1
+
+            graph.add_edges_from(edges_to_add)
             return graph
 
+
         # @tf.function
-        def DSPSM(ms:tf.Tensor,connectivity):
-            return create_graph_global(ms) + connectivity
+        def DSPSM(ms:tf.Tensor, direction=1):
+
+            #create the graph for phase_of_interest
+            graph:nx.Graph = ms_to_graph(ms)
+            node_array:np.ndarray = np.array(graph.nodes)
+
+            #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
+            idx_max_position_in_direction = ms.shape[direction] -1 #index of the voxels of the target surface in the specified direction
+            source_nodes = node_array[node_array[:, direction] == 0]            
+            target_nodes = node_array[node_array[:, direction] == idx_max_position_in_direction] 
+
+            #calculation of the shortest path from source to target nodes
+            #shortest_path = calculate_shortest_path(graph,source_nodes,target_nodes)
+            #print(f'source.nodes: {source_nodes}, {type(source_nodes)}')
+
+            return 1
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            tortuosity_val = DSPSM(ms,connectivity)
+            tortuosity_val = DSPSM(ms)
             return tortuosity_val
         return model
 
