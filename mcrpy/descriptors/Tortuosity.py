@@ -39,13 +39,12 @@ class Tortuosity(PhaseDescriptor):
         **kwargs) -> callable:
 
         #@tf.function
-        def ms_to_graph(ms:Union[tf.Tensor,NDArray],) -> nx.Graph:
+        def ms_to_graph(ms:Union[tf.Tensor,NDArray]) -> nx.Graph:
             # ms mcirostructure
             # phase_to_investigate integer representation of the phase for which the connectivity graph should be investigated
             # connectivity: number of adjacent neighbors for which a connectivity should be allowed. Implemented possibilites are 6, 18 and 24
             # voxel_dimension: the dimension (lx,ly,lz) of each considered voxel. Is needed to calculate the distance between neighbors
-
-            lx, ly, lz = voxel_dimension
+            _voxel_dimension = voxel_dimension
 
             #--------- create nodes: ------------------
             #TODO: make more efficient by not switching between tf and np.ndarray
@@ -60,8 +59,9 @@ class Tortuosity(PhaseDescriptor):
             graph.add_nodes_from(nodes) 
             #print(f'nodes: {graph.nodes}')
             
-            #--------- connect nodes 2D: -----------------
+            
             dimensionality = len(ms.shape)
+            _voxel_dimension = _voxel_dimension[:dimensionality] # omit voxel dimensions, which don't fit to the given microstructure dimensionality
 
             def increment_direction(direction_tuple, index, val):
                 new_direction = np.copy(direction_tuple)
@@ -69,9 +69,9 @@ class Tortuosity(PhaseDescriptor):
                 return tuple(new_direction)
             directions=np.zeros(dimensionality)
             
+            #--------- connect nodes for connectivity=6 implemented for 2D and 3D: -----------------
             if connectivity==6:
-                directions = [increment_direction(directions, index, val) for index in range(dimensionality) for val in [1, -1]]  # This creates both +1 and -1 increments
-
+                directions = np.array([increment_direction(directions, index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
 
             #--------- connect nodes 3D: -----------------
             # if connectivity == 6:
@@ -114,7 +114,7 @@ class Tortuosity(PhaseDescriptor):
 
                 # calculating the distance to the neighbor:
                 normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
-                weighted_distance_vectors = normed_distance_vectors * [lx,ly,lz] # weighted vector differences between the current node to its valid neighbors 
+                weighted_distance_vectors = normed_distance_vectors * [*_voxel_dimension] # weighted vector differences between the current node to its valid neighbors 
                 distances = np.linalg.norm(weighted_distance_vectors, axis=1)
                                 
                 edges_to_add.extend([(node, tuple(valid_neighbor), {'weight': distance}) for valid_neighbor, distance in zip(valid_neighbors, distances)])
@@ -192,20 +192,22 @@ if __name__=="__main__":
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    ms = np.load(minimal_example_ms)
+    #minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    #ms = np.load(minimal_example_ms)
     # ms = ms.astype(np.float64)
-    print(f'ms: {ms}')
-    print(f'type: {type(ms[0])}')
-    print(f'ms type: {type(ms)}, size: {ms.size, len(ms.shape)}')
+    # print(f'ms: {ms}')
+    # print(f'type: {type(ms[0])}')
+    # print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
 
-    #ms = np.zeros((3, 3, 3))
-    #ms[1,:,:] = 1
-    #ms[1,:,] = 1
-    print(f'ms: {ms}')
-    #print(f'type: {type(ms[0,0,0])}')
+    # ms = np.zeros((3, 3, 3))
+    # ms[1,:,:] = 1
+    # ms[1,:,] = 1
+    # print(f'ms: {ms}')
+    # print(f'type: {type(ms[0,0,0])}')
+    # print(f'ms type: {type(ms)}, size: {ms.size}')
+
+    ms = np.random.randint(2, size=(64, 64, 64))
     print(f'ms type: {type(ms)}, size: {ms.size}')
-
 
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
