@@ -119,8 +119,10 @@ class Tortuosity(PhaseDescriptor):
 
 
         # @tf.function
-        def DSPSM(ms: Union[tf.Tensor, NDArray[Any]], direction=2):
+        def DSPSM(ms: Union[tf.Tensor, NDArray[Any]]):
 
+            if type(directions)==int:
+                direction = directions
             #create the graph for phase_of_interest
             graph:nx.Graph = ms_to_graph(ms)
             node_array:np.ndarray = np.array(graph.nodes)
@@ -135,17 +137,36 @@ class Tortuosity(PhaseDescriptor):
             target_nodes = [tuple(row) for row in target_nodes_array.tolist()] # Convert arrays back to former to list of tuples representation
 
             #calculation of the shortest path from the source points to a single specified target node (compare nx.multi_source_dijkstra manual)
+            if (not target_nodes) or (not source_nodes):
+                print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
+                return None
             target_node = target_nodes[0]
-            length, path = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)            
-            #shortest_path_to_target = [nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node) for target_node in target_nodes]
+            length, path = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)
+            # def calculate_shortest_path_length(graph:nx.Graph, source_nodes:Union[tuple[float],list[tuple[float]]], target_node:tuple[float]):
+            #     try:
+            #         path = nx.multi_source_dijkstra(G=graph, source_nodes=source_nodes, target_node=target_node)[0]     
+            #     except:
+            #         path = 1  
+            # def calculate_shortest_path_length(G:nx.Graph, source_nodes:Union[tuple[float],list[tuple[float]]], target_node:tuple[float]):
+            #     #try:
+            #         return nx.multi_source_dijkstra(G=graph, source_nodes=source_nodes, target_node=target_node)[0]     
+            #     #except:
+            #      #   return None
+            # path_length_list = [calculate_shortest_path_length(G=graph, source_nodes=source_nodes, target_node=target_node) for target_node in target_nodes]
+     
+            #path_length_list = [nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0] for target_node in target_nodes]
             #calculate_shortest_path(graph,source_nodes,target_nodes)
-            print(f'source.nodes_aray: {length}, {type(source_nodes)}')
+
+
+            print(f'source.nodes_aray: {source_nodes}')
+            print(f'source.target_nodes: {target_nodes}')
+            print(f'length: {length}')
 
             return 1
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            tortuosity_val = ms_to_graph(ms)
+            tortuosity_val = DSPSM(ms)
             return tortuosity_val
         return model
 
@@ -165,8 +186,8 @@ if __name__=="__main__":
 
     ms = np.zeros((3, 3, 3))
     #ms[1,:,:] = 1
-    ms[0:2,0,0] = 1
-    #print(f'ms: {ms}')
+    ms[1,:,] = 1
+    print(f'ms: {ms}')
 
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
