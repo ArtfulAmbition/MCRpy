@@ -34,7 +34,7 @@ class Tortuosity(PhaseDescriptor):
         connectivity : int = 6,
         method : str = 'DSPSM',
         directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = 1, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -58,7 +58,8 @@ class Tortuosity(PhaseDescriptor):
             
             graph = nx.Graph()
             graph.add_nodes_from(nodes) 
-
+            print(f'nodes: {graph.nodes}')
+            
             #--------- connect nodes: -----------------
             if connectivity == 6:
                 directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
@@ -86,7 +87,17 @@ class Tortuosity(PhaseDescriptor):
             for node in graph.nodes:
                 #x, y, z = node
                 neighbors = node + directions #find all neighbors by coordinates
-                valid_neighbors = neighbors[np.isin(neighbors, graph_nodes).all(axis=1)] #extract the  neighbors which are of the same phase
+                #valid_neighbors = neighbors[np.isin(neighbors, graph_nodes).all(axis=1)] #extract the  neighbors which are of the same phase
+                # Use broadcasting to create a mask of valid neighbors
+                
+                # Use broadcasting to check for matches
+                valid_neighbors_mask = np.any(np.all(neighbors[:, np.newaxis] == graph_nodes, axis=2), axis=1)
+                # Select valid neighbors based on the mask
+                valid_neighbors = neighbors[valid_neighbors_mask]
+
+                # print(f'node: {node}, valid_neighbors: {valid_neighbors}')
+                # print(f'node: {node}, neighbors: {neighbors}')
+                # print(f'node: {node}, graph_nodes: {graph_nodes}')
 
                 # calculating the distance to the neighbor:
                 normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
@@ -103,30 +114,38 @@ class Tortuosity(PhaseDescriptor):
                 #     i+=1
 
             graph.add_edges_from(edges_to_add)
+            #print(f'edges: {graph.edges}')
             return graph
 
 
         # @tf.function
-        def DSPSM(ms:tf.Tensor, direction=1):
+        def DSPSM(ms: Union[tf.Tensor, NDArray[Any]], direction=2):
 
             #create the graph for phase_of_interest
             graph:nx.Graph = ms_to_graph(ms)
             node_array:np.ndarray = np.array(graph.nodes)
+            print(f'node_array: {node_array}')
 
             #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
+            # and the target nodes (to which the shortest path is searched for)
             idx_max_position_in_direction = ms.shape[direction] -1 #index of the voxels of the target surface in the specified direction
-            source_nodes = node_array[node_array[:, direction] == 0]            
-            target_nodes = node_array[node_array[:, direction] == idx_max_position_in_direction] 
+            source_nodes_array = node_array[node_array[:, direction] == 0]            
+            target_nodes_array = node_array[node_array[:, direction] == idx_max_position_in_direction] 
+            source_nodes = [tuple(row) for row in source_nodes_array.tolist()] # Convert arrays back to former to list of tuples representation
+            target_nodes = [tuple(row) for row in target_nodes_array.tolist()] # Convert arrays back to former to list of tuples representation
 
-            #calculation of the shortest path from source to target nodes
-            #shortest_path = calculate_shortest_path(graph,source_nodes,target_nodes)
-            #print(f'source.nodes: {source_nodes}, {type(source_nodes)}')
+            #calculation of the shortest path from the source points to a single specified target node (compare nx.multi_source_dijkstra manual)
+            target_node = target_nodes[0]
+            length, path = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)            
+            #shortest_path_to_target = [nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node) for target_node in target_nodes]
+            #calculate_shortest_path(graph,source_nodes,target_nodes)
+            print(f'source.nodes_aray: {length}, {type(source_nodes)}')
 
             return 1
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            tortuosity_val = DSPSM(ms)
+            tortuosity_val = ms_to_graph(ms)
             return tortuosity_val
         return model
 
@@ -138,11 +157,17 @@ def register() -> None:
 
 if __name__=="__main__":
 
-    import os
-    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    ms = np.load(minimal_example_ms)
-    print(f'ms type: {type(ms)}, size: {ms.size}')
+    # import os
+    # folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+    # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    # ms = np.load(minimal_example_ms)
+    # print(f'ms type: {type(ms)}, size: {ms.size}')
+
+    ms = np.zeros((3, 3, 3))
+    #ms[1,:,:] = 1
+    ms[0:2,0,0] = 1
+    #print(f'ms: {ms}')
+
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
