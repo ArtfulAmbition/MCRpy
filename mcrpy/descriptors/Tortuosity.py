@@ -17,7 +17,7 @@
 
 import tensorflow as tf
 import networkx as nx
-
+from itertools import combinations
 import logging
 
 from mcrpy.src import descriptor_factory
@@ -60,9 +60,22 @@ class Tortuosity(PhaseDescriptor):
             graph.add_nodes_from(nodes) 
             #print(f'nodes: {graph.nodes}')
             
-            #--------- connect nodes: -----------------
-            if connectivity == 6:
-                directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
+            #--------- connect nodes 2D: -----------------
+            dimensionality = len(ms.shape)
+
+            def increment_direction(direction_tuple, index, val):
+                new_direction = np.copy(direction_tuple)
+                new_direction[index] += val
+                return tuple(new_direction)
+            directions=np.zeros(dimensionality)
+            
+            if connectivity==6:
+                directions = [increment_direction(directions, index, val) for index in range(dimensionality) for val in [1, -1]]  # This creates both +1 and -1 increments
+
+
+            #--------- connect nodes 3D: -----------------
+            # if connectivity == 6:
+            #     directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
 
             elif connectivity == 18:
                 directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
@@ -178,18 +191,19 @@ if __name__=="__main__":
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     ms = np.load(minimal_example_ms)
     # ms = ms.astype(np.float64)
     print(f'ms: {ms}')
-    print(f'type: {type(ms[0,0,0])}')
-    print(f'ms type: {type(ms)}, size: {ms.size}')
+    print(f'type: {type(ms[0])}')
+    print(f'ms type: {type(ms)}, size: {ms.size, len(ms.shape)}')
 
-    ms = np.zeros((3, 3, 3))
+    #ms = np.zeros((3, 3, 3))
     #ms[1,:,:] = 1
-    ms[1,:,] = 1
+    #ms[1,:,] = 1
     print(f'ms: {ms}')
-    print(f'type: {type(ms[0,0,0])}')
+    #print(f'type: {type(ms[0,0,0])}')
     print(f'ms type: {type(ms)}, size: {ms.size}')
 
 
