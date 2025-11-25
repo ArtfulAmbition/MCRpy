@@ -33,7 +33,7 @@ class Tortuosity(PhaseDescriptor):
     def make_singlephase_descriptor(
         connectivity : int = 6,
         method : str = 'DSPSM',
-        directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
+        directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -58,7 +58,7 @@ class Tortuosity(PhaseDescriptor):
             
             graph = nx.Graph()
             graph.add_nodes_from(nodes) 
-            print(f'nodes: {graph.nodes}')
+            #print(f'nodes: {graph.nodes}')
             
             #--------- connect nodes: -----------------
             if connectivity == 6:
@@ -126,7 +126,7 @@ class Tortuosity(PhaseDescriptor):
             #create the graph for phase_of_interest
             graph:nx.Graph = ms_to_graph(ms)
             node_array:np.ndarray = np.array(graph.nodes)
-            print(f'node_array: {node_array}')
+            #print(f'node_array: {node_array}')
 
             #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
             # and the target nodes (to which the shortest path is searched for)
@@ -140,8 +140,6 @@ class Tortuosity(PhaseDescriptor):
             if (not target_nodes) or (not source_nodes):
                 print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return None
-            #target_node = target_nodes[0]
-            #length, path = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)
 
             def calculate_path_length(graph, source_nodes, target_node):
                 try:
@@ -149,39 +147,25 @@ class Tortuosity(PhaseDescriptor):
                 except:
                     return None
 
-            #path_length_list = [calculate_path_length(graph, source_nodes, target_node) for target_node in target_nodes]
             path_length_list = [length for target_node in target_nodes if (length := calculate_path_length(graph, source_nodes, target_node)) is not None]
-            #path_length_list = [nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0] for target_node in target_nodes]
 
+            if not path_length_list:
+                print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
+                return None
 
+            # mean_tortuosity = np.mean(path_length_list)
+            # print(f'mean_tortuosity: {mean_tortuosity}')
 
+            # print(f'source.nodes_aray: {source_nodes}')
+            # print(f'source.target_nodes: {target_nodes}')
+            # print(f'length: {path_length_list}')
 
-            # def calculate_shortest_path_length(graph:nx.Graph, source_nodes:Union[tuple[float],list[tuple[float]]], target_node:tuple[float]):
-            #     try:
-            #         path = nx.multi_source_dijkstra(G=graph, source_nodes=source_nodes, target_node=target_node)[0]     
-            #     except:
-            #         path = 1  
-            # def calculate_shortest_path_length(G:nx.Graph, source_nodes:Union[tuple[float],list[tuple[float]]], target_node:tuple[float]):
-            #     #try:
-            #         return nx.multi_source_dijkstra(G=graph, source_nodes=source_nodes, target_node=target_node)[0]     
-            #     #except:
-            #      #   return None
-            # path_length_list = [calculate_shortest_path_length(G=graph, source_nodes=source_nodes, target_node=target_node) for target_node in target_nodes]
-     
-            #path_length_list = [nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0] for target_node in target_nodes]
-            #calculate_shortest_path(graph,source_nodes,target_nodes)
-
-
-            print(f'source.nodes_aray: {source_nodes}')
-            print(f'source.target_nodes: {target_nodes}')
-            print(f'length: {path_length_list}')
-
-            return 1
+            return np.mean(path_length_list)
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            tortuosity_val = DSPSM(ms)
-            return tortuosity_val
+            mean_tortuosity = DSPSM(ms)
+            return mean_tortuosity
         return model
 
 
@@ -192,22 +176,28 @@ def register() -> None:
 
 if __name__=="__main__":
 
-    # import os
-    # folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    # ms = np.load(minimal_example_ms)
-    # print(f'ms type: {type(ms)}, size: {ms.size}')
+    import os
+    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    ms = np.load(minimal_example_ms)
+    # ms = ms.astype(np.float64)
+    print(f'ms: {ms}')
+    print(f'type: {type(ms[0,0,0])}')
+    print(f'ms type: {type(ms)}, size: {ms.size}')
 
     ms = np.zeros((3, 3, 3))
     #ms[1,:,:] = 1
     ms[1,:,] = 1
     print(f'ms: {ms}')
+    print(f'type: {type(ms[0,0,0])}')
+    print(f'ms type: {type(ms)}, size: {ms.size}')
+
 
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    tort = singlephase_descriptor(ms)
+    mean_tort = singlephase_descriptor(ms)
     print('\n -----------------------------')
-    print(tort)
+    print(f'Mean tortuosity value: {mean_tort}')
 
 
