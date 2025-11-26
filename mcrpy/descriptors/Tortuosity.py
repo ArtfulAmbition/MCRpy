@@ -166,14 +166,12 @@ class Tortuosity(PhaseDescriptor):
                 print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return None
 
-            # mean_tortuosity = np.mean(path_length_list)
-            # print(f'mean_tortuosity: {mean_tortuosity}')
+            mean_path_length = np.mean(path_length_list)
+            length_of_ms_in_specified_direction = ms.shape[direction]*voxel_dimension[direction]
 
-            # print(f'source.nodes_aray: {source_nodes}')
-            # print(f'source.target_nodes: {target_nodes}')
-            # print(f'length: {path_length_list}')
 
-            return np.mean(path_length_list)
+
+            return mean_path_length/length_of_ms_in_specified_direction
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
@@ -206,8 +204,8 @@ if __name__=="__main__":
     # print(f'type: {type(ms[0,0,0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    ms = np.random.randint(2, size=(64, 64, 64))
-    print(f'ms type: {type(ms)}, size: {ms.size}')
+    ms = np.random.randint(2, size=(3, 3, 3))
+    print(f'ms: {ms}, size: {ms.size}')
 
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
