@@ -5,29 +5,71 @@ from example_data import example_ms, minimal_example_ms
 from mcrpy.descriptors.Tortuosity import Tortuosity
 from Langner_functions import DSPSM
 
-# class TestTortuosity(unittest.TestCase):
-#     def setUp(self):
+class TestTortuosity(unittest.TestCase):
+    def setUp(self):
+        self.microstructures = {}
+        
+        ms = np.zeros((3, 3))
+        ms[1,:] = 1
+        self.microstructures['BlockingLayer_X_2D'] = ms
 
-# folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-# minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+        ms = np.ones((3, 3))
+        ms[:,0] = 0
+        self.microstructures['PassingLayer_X_2D'] = ms
 
-print("Testing old function: \n\n")
+        ms = np.zeros((3, 3, 3))
+        ms[1,:, :] = 1
+        self.microstructures['BlockingLayer_X_3D'] = ms
 
-ms = np.load(minimal_example_ms)
+        ms = np.zeros((3, 3, 3))
+        ms[:,0,0] = 1
+        self.microstructures['PassingLayer_X_3D'] = ms
 
-print(f'ms type: {type(ms)}, size: {ms.size}')
-tort = DSPSM(_array=ms, _Size_of_Voxel_x=1, _Size_of_Voxel_y =1, _Size_of_Voxel_z=1, _connectivity=6, dir=1, _celltags=[0,1,2])
-print(f'tort= {tort}')
-#singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+        ms = np.zeros((3, 3, 3))
+        ms[0,0, 0] = 1
+        ms[1,0, 0] = 1
+        ms[1,1, 0] = 5
+        ms[1,2, 0] = 1
+        self.microstructures['Edges_X_3D'] = ms
 
-#tort = singlephase_descriptor(ms)
+        ms = np.zeros((3, 3, 3))
+        ms[0,0, 0] = 1
+        ms[1,1, 0] = 1
+        ms[1,1, 1] = 1
+        self.microstructures['Corners_X_3D'] = ms
+    
+    def test_tortuosity_vals(self):
+        self.setUp()
+        args = {
+            'connectivity': 'sides',
+            'method': 'DSPSM',
+            'directions': 0,
+            'phase_of_interest': 0,
+            'voxel_dimension':(2,2,2)       
+            }
 
-print('Testing new function: \n\n')
 
-tortuosity_descriptor = Tortuosity()
-singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
-tort = singlephase_descriptor(ms)
+        tortuosity_descriptor = Tortuosity()
 
+        for method in ['DSPSM','SSPSM']:
+            args['method'] = method
+            singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(**args)
 
+            assert(singlephase_descriptor(self.microstructures['BlockingLayer_X_2D']) is None)
+            assert(singlephase_descriptor(self.microstructures['PassingLayer_X_2D']) == 1)
+
+            assert(singlephase_descriptor(self.microstructures['BlockingLayer_X_3D']) is None)
+            assert(singlephase_descriptor(self.microstructures['PassingLayer_X_3D']) == 1)
+            print('Edges:\n')
+            print(singlephase_descriptor(self.microstructures['Edges_X_3D']))
+            print('Corners:\n')
+            print(singlephase_descriptor(self.microstructures['Corners_X_3D']))
+            
+
+if __name__ == '__main__':
+    print('hello')
+    tort = TestTortuosity()
+    tort.setUp()
+    tort.test_tortuosity_vals()
     
 

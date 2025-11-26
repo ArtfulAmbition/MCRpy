@@ -32,12 +32,12 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 18, # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
+        directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -188,9 +188,9 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
-            print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+            # print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
             skeleton_ms = skeletonize(ms_phase_of_interest)
-            print(f'skeleton:\n {skeleton_ms}')
+            # print(f'skeleton:\n {skeleton_ms}')
             # print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
             # print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
