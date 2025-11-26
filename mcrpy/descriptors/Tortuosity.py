@@ -40,18 +40,13 @@ class Tortuosity(PhaseDescriptor):
         **kwargs) -> callable:
 
         #@tf.function
-        def ms_to_graph(ms:Union[tf.Tensor,NDArray]) -> nx.Graph:
-            # ms mcirostructure
-            # phase_to_investigate integer representation of the phase for which the connectivity graph should be investigated
+        def ms_to_graph(ms_phase_of_interest: NDArray[np.bool_]) -> nx.Graph:
             # connectivity: number of adjacent neighbors for which a connectivity should be allowed. Implemented possibilites are 6, 18 and 24
             # voxel_dimension: the dimension (lx,ly,lz) of each considered voxel. Is needed to calculate the distance between neighbors
             _voxel_dimension = voxel_dimension
 
             #--------- create nodes: ------------------
-            #TODO: make more efficient by not switching between tf and np.ndarray
-            if (type(ms) is tf.Tensor):
-                ms = ms.numpy()
-            coordinates = tf.where(ms == phase_of_interest) # getting the coordinates of voxels with phase id equal to phase_to_investigate
+            coordinates = tf.where(ms_phase_of_interest) # getting the coordinates of voxels with phase id equal to phase_to_investigate
             coordinates_np = coordinates.numpy()
 
             nodes = map(tuple,coordinates_np) # creating a vector of node tuples for insertion to nx.Graph()
@@ -61,7 +56,7 @@ class Tortuosity(PhaseDescriptor):
             #print(f'nodes: {graph.nodes}')
             
             
-            dimensionality = len(ms.shape)
+            dimensionality = len(ms_phase_of_interest.shape)
             _voxel_dimension = _voxel_dimension[:dimensionality] # omit voxel dimensions, which don't fit to the given microstructure dimensionality
 
             def increment_direction(direction_tuple, index, val):
@@ -133,18 +128,20 @@ class Tortuosity(PhaseDescriptor):
 
 
         # @tf.function
-        def DSPSM(ms: Union[tf.Tensor, NDArray[Any]]):
+        def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
+
+            assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
 
             if type(directions)==int:
                 direction = directions
             #create the graph for phase_of_interest
-            graph:nx.Graph = ms_to_graph(ms)
+            graph:nx.Graph = ms_to_graph(ms_phase_of_interest)
             node_array:np.ndarray = np.array(graph.nodes)
             #print(f'node_array: {node_array}')
 
             #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
             # and the target nodes (to which the shortest path is searched for)
-            idx_max_position_in_direction = ms.shape[direction] -1 #index of the voxels of the target surface in the specified direction
+            idx_max_position_in_direction = ms_phase_of_interest.shape[direction] -1 #index of the voxels of the target surface in the specified direction
             source_nodes_array = node_array[node_array[:, direction] == 0]            
             target_nodes_array = node_array[node_array[:, direction] == idx_max_position_in_direction] 
             source_nodes = [tuple(row) for row in source_nodes_array.tolist()] # Convert arrays back to former to list of tuples representation
@@ -157,33 +154,37 @@ class Tortuosity(PhaseDescriptor):
 
             def calculate_path_length(graph, source_nodes, target_node):
                 try:
-                    return nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0]
+                    return nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0] 
                 except:
                     return None
 
-            path_length_list = [length for target_node in target_nodes if (length := calculate_path_length(graph, source_nodes, target_node)) is not None]
+            len_first_voxel_in_direction = voxel_dimension[direction] # needs to be added to each path length, because the length of the length of the source voxels are omitted when calculation the path lenght via a graph. 
+            path_length_list = [length + len_first_voxel_in_direction for target_node in target_nodes if (length := calculate_path_length(graph, source_nodes, target_node)) is not None]
 
             if not path_length_list:
                 print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return None
 
             mean_path_length = np.mean(path_length_list)
-            length_of_ms_in_specified_direction = ms.shape[direction]*voxel_dimension[direction]
+            length_of_ms_in_specified_direction = ms_phase_of_interest.shape[direction]*voxel_dimension[direction]
+            print(f'length_of_ms_in_specified_direction: {length_of_ms_in_specified_direction}')
+            print(f'mean_path_length: {mean_path_length}')
+            print(f'path_length_list: {path_length_list}')
 
             return mean_path_length/length_of_ms_in_specified_direction
         
-        def calculate_tortuosity(ms_phase_of_interest:NDArray[np.bool_]):
-            # ms_phase_of_interest must be an np.ndarray with bool values representing the 
-            # microstructure ms where the searched for phase is represented as True, else False.
+        def determine_tortuosity(ms_phase_of_interest:NDArray[np.bool_]):
+
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
 
 
 
-        def SSPSM(ms: Union[tf.Tensor, NDArray[Any]]):
+        def SSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             '''
             Skeleton Shortest Path Searching Method
             '''     
-            ms_phase_of_interest = ms==phase_of_interest
+            assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
+            
             print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
             skeleton_ms = skeletonize(ms_phase_of_interest)
             print(f'skeleton:\n {skeleton_ms}')
@@ -191,8 +192,12 @@ class Tortuosity(PhaseDescriptor):
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            #mean_tortuosity = DSPSM(ms)
-            mean_tortuosity = SSPSM(ms)
+            
+            # ms_phase_of_interest is an np.ndarray with bool values representing the 
+            # microstructure ms where the searched for phase is represented as True, else False.
+            ms_phase_of_interest = ms == phase_of_interest
+            #mean_tortuosity = DSPSM(ms_phase_of_interest)
+            mean_tortuosity = SSPSM(ms_phase_of_interest)
             return mean_tortuosity
         return model
 
@@ -214,15 +219,15 @@ if __name__=="__main__":
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
 
-    # ms = np.zeros((3, 3, 3))
-    # ms[1,:,:] = 1
-    # ms[1,:,] = 1
-    # print(f'ms: {ms}')
-    # print(f'type: {type(ms[0,0,0])}')
-    # print(f'ms type: {type(ms)}, size: {ms.size}')
+    ms = np.zeros((3, 3, 3))
+    ms[1,:,:] = 1
+    ms[1,:,] = 1
+    print(f'ms: {ms}')
+    print(f'shape: {(ms.shape)}')
+    print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    ms = np.random.randint(2, size=(3, 3, 3))
-    print(f'ms: {ms}, size: {ms.size}')
+    # ms = np.random.randint(2, size=(3, 3, 3))
+    # print(f'ms: {ms}, size: {ms.size}')
 
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
