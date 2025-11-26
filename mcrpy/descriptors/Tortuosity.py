@@ -139,7 +139,7 @@ class Tortuosity(PhaseDescriptor):
 
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
 
-            print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+            #print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
 
             if type(directions)==int:
                 direction = directions
@@ -158,7 +158,7 @@ class Tortuosity(PhaseDescriptor):
 
             #calculation of the shortest path from the source points to a single specified target node (compare nx.multi_source_dijkstra manual)
             if (not target_nodes) or (not source_nodes):
-                print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
+                #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return None
 
             def calculate_path_length(graph, source_nodes, target_node):
@@ -171,14 +171,14 @@ class Tortuosity(PhaseDescriptor):
             path_length_list = [length + len_first_voxel_in_direction for target_node in target_nodes if (length := calculate_path_length(graph, source_nodes, target_node)) is not None]
 
             if not path_length_list:
-                print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
+                #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return None
 
             mean_path_length = np.mean(path_length_list)
             length_of_ms_in_specified_direction = ms_phase_of_interest.shape[direction]*voxel_dimension[direction]
-            print(f'length_of_ms_in_specified_direction: {length_of_ms_in_specified_direction}')
-            print(f'mean_path_length: {mean_path_length}')
-            print(f'path_length_list: {path_length_list}')
+            # print(f'length_of_ms_in_specified_direction: {length_of_ms_in_specified_direction}')
+            # print(f'mean_path_length: {mean_path_length}')
+            # print(f'path_length_list: {path_length_list}')
 
             return mean_path_length/length_of_ms_in_specified_direction
         
@@ -190,7 +190,7 @@ class Tortuosity(PhaseDescriptor):
             
             # print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
             skeleton_ms = skeletonize(ms_phase_of_interest)
-            # print(f'skeleton:\n {skeleton_ms}')
+            #print(f'skeleton:\n {skeleton_ms}')
             # print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
             # print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
@@ -217,38 +217,38 @@ def register() -> None:
 
        
 
-if __name__=="__main__":
+# if __name__=="__main__":
 
-    import os
-    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    #minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    #ms = np.load(minimal_example_ms)
-    # ms = ms.astype(np.float64)
-    # print(f'ms: {ms}')
-    # print(f'type: {type(ms[0])}')
-    # print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
+#     import os
+#     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+#     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+#     #minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+#     #ms = np.load(minimal_example_ms)
+#     # ms = ms.astype(np.float64)
+#     # print(f'ms: {ms}')
+#     # print(f'type: {type(ms[0])}')
+#     # print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
 
-    # ms = np.zeros((3, 3, 3))
-    # ms[1,:,:] = 1
-    # print(f'ms: {ms}')
-    # print(f'shape: {(ms.shape)}')
-    # print(f'ms type: {type(ms)}, size: {ms.size}')
+#     # ms = np.zeros((3, 3, 3))
+#     # ms[1,:,:] = 1
+#     # print(f'ms: {ms}')
+#     # print(f'shape: {(ms.shape)}')
+#     # print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    ms = np.zeros((3, 3))
-    ms[1,:] = 1
-    print(f'ms: {ms}')
-    print(f'shape: {(ms.shape)}')
-    print(f'ms type: {type(ms)}, size: {ms.size}')
+#     ms = np.zeros((3, 3))
+#     ms[1,:] = 1
+#     print(f'ms: {ms}')
+#     print(f'shape: {(ms.shape)}')
+#     print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    # ms = np.random.randint(2, size=(3, 3, 3))
-    # print(f'ms: {ms}, size: {ms.size}')
+#     # ms = np.random.randint(2, size=(3, 3, 3))
+#     # print(f'ms: {ms}, size: {ms.size}')
 
-    tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+#     tortuosity_descriptor = Tortuosity()
+#     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    mean_tort = singlephase_descriptor(ms)
-    print('\n -----------------------------')
-    print(f'Mean tortuosity value: {mean_tort}')
+#     mean_tort = singlephase_descriptor(ms)
+#     print('\n -----------------------------')
+#     print(f'Mean tortuosity value: {mean_tort}')
 
 

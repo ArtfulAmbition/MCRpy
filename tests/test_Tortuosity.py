@@ -25,17 +25,17 @@ class TestTortuosity(unittest.TestCase):
         ms[:,0,0] = 1
         self.microstructures['PassingLayer_X_3D'] = ms
 
-        ms = np.zeros((3, 3, 3))
+        ms = np.ones((3, 3, 3))
         ms[0,0, 0] = 1
         ms[1,0, 0] = 1
-        ms[1,1, 0] = 5
+        ms[1,1, 0] = 1
         ms[1,2, 0] = 1
         self.microstructures['Edges_X_3D'] = ms
 
-        ms = np.zeros((3, 3, 3))
-        ms[0,0, 0] = 1
-        ms[1,1, 0] = 1
-        ms[1,1, 1] = 1
+        ms = np.ones((3, 3, 3))
+        ms[0,0, 0] = 0
+        ms[1,1, 1] = 0
+        ms[2,2, 2] = 0
         self.microstructures['Corners_X_3D'] = ms
     
     def test_tortuosity_vals(self):
@@ -60,14 +60,8 @@ class TestTortuosity(unittest.TestCase):
 
             assert(singlephase_descriptor(self.microstructures['BlockingLayer_X_3D']) is None)
             assert(singlephase_descriptor(self.microstructures['PassingLayer_X_3D']) == 1)
-            print('Edges:\n')
-            print(singlephase_descriptor(self.microstructures['Edges_X_3D']))
-            print('Corners:\n')
-            print(singlephase_descriptor(self.microstructures['Corners_X_3D']))
-            
-
+        
 if __name__ == '__main__':
-    print('hello')
     tort = TestTortuosity()
     tort.setUp()
     tort.test_tortuosity_vals()
