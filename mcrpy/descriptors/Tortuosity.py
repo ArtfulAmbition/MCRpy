@@ -32,9 +32,12 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : int = 6,
+        connectivity : Union[int,str] = 18, # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
+        # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
+        # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        directions : Union[int,list[int]] = 2, #0:x, 1:y, 2:z
+        directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -45,7 +48,7 @@ class Tortuosity(PhaseDescriptor):
             # voxel_dimension: the dimension (lx,ly,lz) of each considered voxel. Is needed to calculate the distance between neighbors
             _voxel_dimension = voxel_dimension
 
-            #--------- create nodes: ------------------
+            #--------- create nodes for graph: ------------------
             coordinates = tf.where(ms_phase_of_interest) # getting the coordinates of voxels with phase id equal to phase_to_investigate
             coordinates_np = coordinates.numpy()
 
@@ -59,35 +62,39 @@ class Tortuosity(PhaseDescriptor):
             dimensionality = len(ms_phase_of_interest.shape)
             _voxel_dimension = _voxel_dimension[:dimensionality] # omit voxel dimensions, which don't fit to the given microstructure dimensionality
 
-            def increment_direction(direction_tuple, index, val):
-                new_direction = np.copy(direction_tuple)
-                new_direction[index] += val
-                return tuple(new_direction)
-            directions=np.zeros(dimensionality)
-            
+
+            assert connectivity in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
             #--------- connect nodes for connectivity=6 implemented for 2D and 3D: -----------------
-            if connectivity==6:
+            if (connectivity in ['sides', 6, 4]) or (connectivity in ['edges', 4] and dimensionality == 2):
+                def increment_direction(direction_tuple, index, val):
+                    new_direction = np.copy(direction_tuple)
+                    new_direction[index] += val
+                    return tuple(new_direction)
+                directions=np.zeros(dimensionality)
                 directions = np.array([increment_direction(directions, index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
+                # old code:
+                # if connectivity == 6:
+                #     directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
 
-            #--------- connect nodes 3D: -----------------
-            # if connectivity == 6:
-            #     directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
-
-            elif connectivity == 18:
+            elif connectivity in ['edges', 18] and dimensionality == 3:
                 directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                             (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                             (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                             (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)])
-                
-            elif connectivity == 26:
+                                
+            elif connectivity in ['corners', 26] and dimensionality == 3:
                 directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                       (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                       (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                       (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
                       (1, 1, 1), (1, -1, 1), (-1, 1, 1), (-1, -1, 1),
                       (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)])  
+            
+            elif connectivity in ['corners', 8] and dimensionality == 2:
+                directions = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
+                      (1, 1), (-1, 1), (1, -1), (-1, -1)])  
             else:
-                raise Exception("wrong input for connectivity value. Valid inputs are 6, 18 or 26.")
+                raise Exception("Connectivity argument and dimensionality mismatch! Valid arguments for 3D are ['sides', 'edges, 'corners', 6, 18, 28] and for 2D ['sides', 'edges, 'corners', 4, 8],  Valid inputs are 'sides', 'edges, 'corners' 4, 6, 8, 18 26.")
 
             graph_nodes = np.array(list(graph.nodes))  # Convert to np.array for vectorized operations
             edges_to_add = []  # List to store edges before adding
@@ -184,8 +191,8 @@ class Tortuosity(PhaseDescriptor):
             print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
             skeleton_ms = skeletonize(ms_phase_of_interest)
             print(f'skeleton:\n {skeleton_ms}')
-            print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
-            print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
+            # print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
+            # print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
         # @tf.function
@@ -222,8 +229,14 @@ if __name__=="__main__":
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
 
-    ms = np.zeros((3, 3, 3))
-    ms[1,:,:] = 1
+    # ms = np.zeros((3, 3, 3))
+    # ms[1,:,:] = 1
+    # print(f'ms: {ms}')
+    # print(f'shape: {(ms.shape)}')
+    # print(f'ms type: {type(ms)}, size: {ms.size}')
+
+    ms = np.zeros((3, 3))
+    ms[1,:] = 1
     print(f'ms: {ms}')
     print(f'shape: {(ms.shape)}')
     print(f'ms type: {type(ms)}, size: {ms.size}')
