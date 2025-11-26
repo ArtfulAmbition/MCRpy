@@ -25,6 +25,7 @@ from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from numpy.typing import NDArray
 from typing import Any, Union
 import numpy as np
+from skimage.morphology import skeletonize
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
@@ -169,13 +170,29 @@ class Tortuosity(PhaseDescriptor):
             mean_path_length = np.mean(path_length_list)
             length_of_ms_in_specified_direction = ms.shape[direction]*voxel_dimension[direction]
 
-
-
             return mean_path_length/length_of_ms_in_specified_direction
+        
+        def calculate_tortuosity(ms_phase_of_interest:NDArray[np.bool_]):
+            # ms_phase_of_interest must be an np.ndarray with bool values representing the 
+            # microstructure ms where the searched for phase is represented as True, else False.
+            assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
+
+
+
+        def SSPSM(ms: Union[tf.Tensor, NDArray[Any]]):
+            '''
+            Skeleton Shortest Path Searching Method
+            '''     
+            ms_phase_of_interest = ms==phase_of_interest
+            print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+            skeleton_ms = skeletonize(ms_phase_of_interest)
+            print(f'skeleton:\n {skeleton_ms}')
+            return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
         # @tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            mean_tortuosity = DSPSM(ms)
+            #mean_tortuosity = DSPSM(ms)
+            mean_tortuosity = SSPSM(ms)
             return mean_tortuosity
         return model
 
