@@ -33,8 +33,8 @@ class Tortuosity(PhaseDescriptor):
     @staticmethod
     def make_singlephase_descriptor(
         connectivity : int = 6,
-        method : str = 'DSPSM',
-        directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
+        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        directions : Union[int,list[int]] = 2, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -132,6 +132,8 @@ class Tortuosity(PhaseDescriptor):
 
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
 
+            print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+
             if type(directions)==int:
                 direction = directions
             #create the graph for phase_of_interest
@@ -173,12 +175,6 @@ class Tortuosity(PhaseDescriptor):
 
             return mean_path_length/length_of_ms_in_specified_direction
         
-        def determine_tortuosity(ms_phase_of_interest:NDArray[np.bool_]):
-
-            assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
-
-
-
         def SSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             '''
             Skeleton Shortest Path Searching Method
@@ -188,6 +184,8 @@ class Tortuosity(PhaseDescriptor):
             print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
             skeleton_ms = skeletonize(ms_phase_of_interest)
             print(f'skeleton:\n {skeleton_ms}')
+            print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
+            print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
         # @tf.function
@@ -195,9 +193,14 @@ class Tortuosity(PhaseDescriptor):
             
             # ms_phase_of_interest is an np.ndarray with bool values representing the 
             # microstructure ms where the searched for phase is represented as True, else False.
+            # For further calculations, use ms_phase_of_interest:
             ms_phase_of_interest = ms == phase_of_interest
-            #mean_tortuosity = DSPSM(ms_phase_of_interest)
-            mean_tortuosity = SSPSM(ms_phase_of_interest)
+
+            if method == 'DSPSM':  
+                mean_tortuosity = DSPSM(ms_phase_of_interest)
+            elif method == 'SSPSM':  
+                mean_tortuosity = SSPSM(ms_phase_of_interest)
+                
             return mean_tortuosity
         return model
 
@@ -221,7 +224,6 @@ if __name__=="__main__":
 
     ms = np.zeros((3, 3, 3))
     ms[1,:,:] = 1
-    ms[1,:,] = 1
     print(f'ms: {ms}')
     print(f'shape: {(ms.shape)}')
     print(f'ms type: {type(ms)}, size: {ms.size}')
