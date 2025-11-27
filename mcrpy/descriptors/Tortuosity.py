@@ -19,6 +19,7 @@ import tensorflow as tf
 import networkx as nx
 from itertools import combinations
 import logging
+import pickle
 
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
@@ -36,7 +37,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
@@ -117,17 +118,14 @@ class Tortuosity(PhaseDescriptor):
 
                 # calculating the distance to the neighbor:
                 normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
+                
+                print(f'normed_distance_vectors: {normed_distance_vectors}')
+                print(f'normed_distance_vectors: {_voxel_dimension}')
+
                 weighted_distance_vectors = normed_distance_vectors * [*_voxel_dimension] # weighted vector differences between the current node to its valid neighbors 
                 distances = np.linalg.norm(weighted_distance_vectors, axis=1)
                                 
                 edges_to_add.extend([(node, tuple(valid_neighbor), {'weight': distance}) for valid_neighbor, distance in zip(valid_neighbors, distances)])
-
-                # if i==0:
-                #     print(f'valid_neighbors= {valid_neighbors}')
-                #     print(f'node= {node}')
-                #     print(f'distance= {distances}')
-                #     print(f'edges_to_add= {edges_to_add}')
-                #     i+=1
 
             graph.add_edges_from(edges_to_add)
             #print(f'edges: {graph.edges}')
@@ -188,7 +186,8 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
-            # print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+            print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+
             skeleton_ms = skeletonize(ms_phase_of_interest)
             #print(f'skeleton:\n {skeleton_ms}')
             # print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
@@ -201,8 +200,12 @@ class Tortuosity(PhaseDescriptor):
             # ms_phase_of_interest is an np.ndarray with bool values representing the 
             # microstructure ms where the searched for phase is represented as True, else False.
             # For further calculations, use ms_phase_of_interest:
+            desired_shape_2d = (20,20)
+            ms = tf.reshape(ms, desired_shape_2d)
+            print(f'ms:{ms.shape}')
+            
             ms_phase_of_interest = ms == phase_of_interest
-
+            
             if method == 'DSPSM':  
                 mean_tortuosity = DSPSM(ms_phase_of_interest)
             elif method == 'SSPSM':  
@@ -217,17 +220,27 @@ def register() -> None:
 
        
 
-# if __name__=="__main__":
+if __name__=="__main__":
 
-#     import os
-#     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-#     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-#     #minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-#     #ms = np.load(minimal_example_ms)
-#     # ms = ms.astype(np.float64)
-#     # print(f'ms: {ms}')
-#     # print(f'type: {type(ms[0])}')
-#     # print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
+    import os
+    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+    result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
+    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
+    minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
+
+
+    #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    #minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    # ms = ms.astype(np.float64)
+    ms = np.load(minimal_example_ms)
+    print(f'ms: {ms}')
+    print(f'type: {type(ms[0])}')
+    print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
+    print(f'shape: {ms.shape}')
+    print(np.unique(ms))
+
+    np
+
 
 #     # ms = np.zeros((3, 3, 3))
 #     # ms[1,:,:] = 1
@@ -244,11 +257,22 @@ def register() -> None:
 #     # ms = np.random.randint(2, size=(3, 3, 3))
 #     # print(f'ms: {ms}, size: {ms.size}')
 
-#     tortuosity_descriptor = Tortuosity()
-#     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+    tortuosity_descriptor = Tortuosity()
+    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-#     mean_tort = singlephase_descriptor(ms)
-#     print('\n -----------------------------')
-#     print(f'Mean tortuosity value: {mean_tort}')
+    mean_tort = singlephase_descriptor(ms)
+    print('\n -----------------------------')
+    print(f'Mean tortuosity value: {mean_tort}')
+
+
+    # Step 2: Open the pickle file
+    pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_20x20_characterization.pickle')
+    with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
+        # Step 3: Load the data
+        data = pickle.load(file)
+
+    # Print or use the data
+    print(f"data: {data}")
+ 
 
 
