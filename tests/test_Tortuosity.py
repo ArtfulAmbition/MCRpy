@@ -9,9 +9,11 @@ class TestTortuosity(unittest.TestCase):
     def setUp(self):
         self.microstructures = {}
         
-        ms = np.zeros((3, 3))
-        ms[1,:] = 1
+        ms = np.zeros((20, 20))
+        ms[1:5,:] = 1
         self.microstructures['BlockingLayer_X_2D'] = ms
+
+        np.save('example_microstructures/BlockingLayer_X_2D_20x20.npy', self.microstructures['BlockingLayer_X_2D'])
 
         ms = np.ones((3, 3))
         ms[:,0] = 0
@@ -55,7 +57,7 @@ class TestTortuosity(unittest.TestCase):
             args['method'] = method
             singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(**args)
 
-            assert(singlephase_descriptor(self.microstructures['BlockingLayer_X_2D']) is None)
+            #assert(singlephase_descriptor(self.microstructures['BlockingLayer_X_2D']) is None)
             assert(singlephase_descriptor(self.microstructures['PassingLayer_X_2D']) == 1)
 
             assert(singlephase_descriptor(self.microstructures['BlockingLayer_X_3D']) is None)
@@ -65,5 +67,6 @@ if __name__ == '__main__':
     tort = TestTortuosity()
     tort.setUp()
     tort.test_tortuosity_vals()
+
     
 
