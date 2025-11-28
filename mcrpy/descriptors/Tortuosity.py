@@ -157,7 +157,7 @@ class Tortuosity(PhaseDescriptor):
             #calculation of the shortest path from the source points to a single specified target node (compare nx.multi_source_dijkstra manual)
             if (not target_nodes) or (not source_nodes):
                 #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
-                return None
+                return np.float64(0)
 
             def calculate_path_length(graph, source_nodes, target_node):
                 try:
@@ -170,7 +170,7 @@ class Tortuosity(PhaseDescriptor):
 
             if not path_length_list:
                 #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
-                return None
+                return np.float64(0)
 
             mean_path_length = np.mean(path_length_list)
             length_of_ms_in_specified_direction = ms_phase_of_interest.shape[direction]*voxel_dimension[direction]
@@ -210,7 +210,8 @@ class Tortuosity(PhaseDescriptor):
                 mean_tortuosity = DSPSM(ms_phase_of_interest)
             elif method == 'SSPSM':  
                 mean_tortuosity = SSPSM(ms_phase_of_interest)
-                
+            print(f'mean_tortuosity: {mean_tortuosity}')
+            print(f'mean_tortuosity_type: {type(mean_tortuosity)}')
             return mean_tortuosity
         return model
 
@@ -230,7 +231,7 @@ if __name__=="__main__":
 
 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    #minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     # ms = ms.astype(np.float64)
     ms = np.load(minimal_example_ms)
     print(f'ms: {ms}')
