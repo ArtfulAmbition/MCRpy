@@ -38,7 +38,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
@@ -57,9 +57,7 @@ class Tortuosity(PhaseDescriptor):
             nodes = map(tuple,coordinates_np) # creating a vector of node tuples for insertion to nx.Graph()
             
             graph = nx.Graph()
-            graph.add_nodes_from(nodes) 
-            #print(f'nodes: {graph.nodes}')
-            
+            graph.add_nodes_from(nodes)             
             
             dimensionality = len(ms_phase_of_interest.shape)
             _voxel_dimension = _voxel_dimension[:dimensionality] # omit voxel dimensions, which don't fit to the given microstructure dimensionality
@@ -113,39 +111,27 @@ class Tortuosity(PhaseDescriptor):
                 # Select valid neighbors based on the mask
                 valid_neighbors = neighbors[valid_neighbors_mask]
 
-                # print(f'node: {node}, valid_neighbors: {valid_neighbors}')
-                # print(f'node: {node}, neighbors: {neighbors}')
-                # print(f'node: {node}, graph_nodes: {graph_nodes}')
-
                 # calculating the distance to the neighbor:
                 normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
                 
-                #print(f'normed_distance_vectors: {normed_distance_vectors}')
-                #print(f'normed_distance_vectors: {_voxel_dimension}')
-
                 weighted_distance_vectors = normed_distance_vectors * [*_voxel_dimension] # weighted vector differences between the current node to its valid neighbors 
                 distances = np.linalg.norm(weighted_distance_vectors, axis=1)
                                 
                 edges_to_add.extend([(node, tuple(valid_neighbor), {'weight': distance}) for valid_neighbor, distance in zip(valid_neighbors, distances)])
 
             graph.add_edges_from(edges_to_add)
-            #print(f'edges: {graph.edges}')
             return graph
 
 
         #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
-
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
-
-            #print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
 
             if type(directions)==int:
                 direction = directions
             #create the graph for phase_of_interest
             graph:nx.Graph = ms_to_graph(ms_phase_of_interest)
             node_array:np.ndarray = np.array(graph.nodes)
-            #print(f'node_array: {node_array}')
 
             #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
             # and the target nodes (to which the shortest path is searched for)
@@ -175,9 +161,6 @@ class Tortuosity(PhaseDescriptor):
 
             mean_path_length = np.mean(path_length_list)
             length_of_ms_in_specified_direction = ms_phase_of_interest.shape[direction]*voxel_dimension[direction]
-            # print(f'length_of_ms_in_specified_direction: {length_of_ms_in_specified_direction}')
-            # print(f'mean_path_length: {mean_path_length}')
-            # print(f'path_length_list: {path_length_list}')
 
             return mean_path_length/length_of_ms_in_specified_direction
         
@@ -187,12 +170,7 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
-            #print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
-
             skeleton_ms = skeletonize(ms_phase_of_interest)
-            #print(f'skeleton:\n {skeleton_ms}')
-            # print(f'skeleton_type:\n {type(skeleton_ms)}, {type(skeleton_ms[0,0,0])}')
-            # print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
         #@tf.function
@@ -202,11 +180,8 @@ class Tortuosity(PhaseDescriptor):
             # microstructure ms where the searched for phase is represented as True, else False.
             # For further calculations, use ms_phase_of_interest:
             
-            print(f'ms:{ms.shape}')
             desired_shape =tuple(ms.shape[1:-1])
-            print(desired_shape)
-            ms = tf.reshape(ms, desired_shape)
-            print(f'ms:{ms.shape}')
+            ms = tf.reshape(ms, desired_shape).numpy()
             
             ms_phase_of_interest = ms == phase_of_interest
             
@@ -214,8 +189,7 @@ class Tortuosity(PhaseDescriptor):
                 mean_tortuosity = DSPSM(ms_phase_of_interest)
             elif method == 'SSPSM':  
                 mean_tortuosity = SSPSM(ms_phase_of_interest)
-            #print(f'mean_tortuosity: {mean_tortuosity}')
-            #print(f'mean_tortuosity_type: {type(mean_tortuosity)}')
+
             return tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
@@ -229,7 +203,6 @@ if __name__=="__main__":
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    #result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
     minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
     # minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
 
@@ -279,14 +252,13 @@ if __name__=="__main__":
     # print(f'Mean tortuosity value: {mean_tort}')
 
 
-    # # Step 2: Open the pickle file
-    # pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_20x20_characterization.pickle')
-    # with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
-    #     # Step 3: Load the data
-    #     data = pickle.load(file)
-
-    # # Print or use the data
-    # print(f"data: {data}")
+    # Step 2: Open the pickle file
+    result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
+    pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_32x32_characterization.pickle')
+    with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
+        # Step 3: Load the data
+        data = pickle.load(file)
+    print(f"data: {data}")
  
 
 

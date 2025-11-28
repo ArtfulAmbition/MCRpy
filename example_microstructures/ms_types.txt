@@ -1,0 +1,205 @@
+filename: alloy_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: Holzer2020_Fine_Zoom0.33_Size60.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 8000
+shape: (20, 20, 20)
+unique: [0 1 2]
+
+
+
+filename: ceramics_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: pymks_ms_256x256_1.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: carbonate_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: copolymer_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: carbonate_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: composite_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1 2]
+
+
+
+filename: composite_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1 2]
+
+
+
+filename: pymks_ms_256x256_2.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: sandstone_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: pymks_ms_128x128_2.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 16384
+shape: (128, 128)
+unique: [0 1]
+
+
+
+filename: alloy_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: pymks_ms_64x64_2.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: pmma_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: pmma_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: BlockingLayer_X_2D_20x20.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 400
+shape: (20, 20)
+unique: [0 1]
+
+
+
+filename: pymks_ms_64x64_3.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: sandstone_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: pymks_ms_128x128_1.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 16384
+shape: (128, 128)
+unique: [0 1]
+
+
+
+filename: ceramics_resized_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: pymks_ms_256x256_3.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: copolymer_resized.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 65536
+shape: (256, 256)
+unique: [0 1]
+
+
+
+filename: alloy_inverted_s.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
+
+
+
+filename: pymks_ms_128x128_3.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 16384
+shape: (128, 128)
+unique: [0 1]
+
+
+
+filename: pymks_ms_64x64_1.npy
+type: <class 'numpy.ndarray'>
+ms type: <class 'numpy.ndarray'>, size: 4096
+shape: (64, 64)
+unique: [0 1]
