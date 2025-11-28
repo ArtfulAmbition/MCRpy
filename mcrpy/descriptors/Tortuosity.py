@@ -30,6 +30,7 @@ from skimage.morphology import skeletonize
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
+    tf.experimental.numpy.experimental_enable_numpy_behavior()
 
     @staticmethod
     def make_singlephase_descriptor(
@@ -38,7 +39,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        directions : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
+        directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -119,8 +120,8 @@ class Tortuosity(PhaseDescriptor):
                 # calculating the distance to the neighbor:
                 normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
                 
-                print(f'normed_distance_vectors: {normed_distance_vectors}')
-                print(f'normed_distance_vectors: {_voxel_dimension}')
+                #print(f'normed_distance_vectors: {normed_distance_vectors}')
+                #print(f'normed_distance_vectors: {_voxel_dimension}')
 
                 weighted_distance_vectors = normed_distance_vectors * [*_voxel_dimension] # weighted vector differences between the current node to its valid neighbors 
                 distances = np.linalg.norm(weighted_distance_vectors, axis=1)
@@ -132,7 +133,7 @@ class Tortuosity(PhaseDescriptor):
             return graph
 
 
-        # @tf.function
+        #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
 
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
@@ -186,7 +187,7 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
-            print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
+            #print(f'ms_phase_of_interest:\n {ms_phase_of_interest}')
 
             skeleton_ms = skeletonize(ms_phase_of_interest)
             #print(f'skeleton:\n {skeleton_ms}')
@@ -194,14 +195,17 @@ class Tortuosity(PhaseDescriptor):
             # print(f'ms_phase_of_interest:\n {type(ms_phase_of_interest)}, {type(ms_phase_of_interest[0,0,0])}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
-        # @tf.function
+        #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             
             # ms_phase_of_interest is an np.ndarray with bool values representing the 
             # microstructure ms where the searched for phase is represented as True, else False.
             # For further calculations, use ms_phase_of_interest:
-            desired_shape_2d = (20,20)
-            ms = tf.reshape(ms, desired_shape_2d)
+            
+            print(f'ms:{ms.shape}')
+            desired_shape =tuple(ms.shape[1:-1])
+            print(desired_shape)
+            ms = tf.reshape(ms, desired_shape)
             print(f'ms:{ms.shape}')
             
             ms_phase_of_interest = ms == phase_of_interest
@@ -210,9 +214,9 @@ class Tortuosity(PhaseDescriptor):
                 mean_tortuosity = DSPSM(ms_phase_of_interest)
             elif method == 'SSPSM':  
                 mean_tortuosity = SSPSM(ms_phase_of_interest)
-            print(f'mean_tortuosity: {mean_tortuosity}')
-            print(f'mean_tortuosity_type: {type(mean_tortuosity)}')
-            return mean_tortuosity
+            #print(f'mean_tortuosity: {mean_tortuosity}')
+            #print(f'mean_tortuosity_type: {type(mean_tortuosity)}')
+            return tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
 
@@ -225,22 +229,31 @@ if __name__=="__main__":
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
+    #result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
     minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
-    minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
+    # minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
+
+    # for filename in os.listdir(folder):
+    #     if filename.endswith('.npy'):  # Check if the file has a .npy extension
+    #         file_path = os.path.join(folder, filename)  # Full path to the file
+    #         print(f'filename: {filename}')
+    #         ms = np.load(file_path)  # Load the .npy file
+    #         #print(f'ms: {ms}')
+    #         print(f'type: {type(ms[0])}')
+    #         print(f'ms type: {type(ms)}, size: {ms.size}')
+    #         print(f'shape: {ms.shape}')
+    #         print(f'unique: {np.unique(ms)}')
+    #         print('\n\n')
 
 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    # ms = ms.astype(np.float64)
-    ms = np.load(minimal_example_ms)
-    print(f'ms: {ms}')
-    print(f'type: {type(ms[0])}')
-    print(f'ms type: {type(ms)}, size: {ms.size, ms.shape}')
-    print(f'shape: {ms.shape}')
-    print(np.unique(ms))
-
-    np
+    # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    # ms = np.load(minimal_example_ms)
+    # print(f'ms: {ms}')
+    # print(f'type: {type(ms[0])}')
+    # print(f'ms type: {type(ms)}, size: {ms.size}')
+    # print(f'shape: {ms.shape}')
+    # print(np.unique(ms))
 
 
 #     # ms = np.zeros((3, 3, 3))
@@ -258,22 +271,22 @@ if __name__=="__main__":
 #     # ms = np.random.randint(2, size=(3, 3, 3))
 #     # print(f'ms: {ms}, size: {ms.size}')
 
-    tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+    # tortuosity_descriptor = Tortuosity()
+    # singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    mean_tort = singlephase_descriptor(ms)
-    print('\n -----------------------------')
-    print(f'Mean tortuosity value: {mean_tort}')
+    # mean_tort = singlephase_descriptor(ms)
+    # print('\n -----------------------------')
+    # print(f'Mean tortuosity value: {mean_tort}')
 
 
-    # Step 2: Open the pickle file
-    pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_20x20_characterization.pickle')
-    with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
-        # Step 3: Load the data
-        data = pickle.load(file)
+    # # Step 2: Open the pickle file
+    # pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_20x20_characterization.pickle')
+    # with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
+    #     # Step 3: Load the data
+    #     data = pickle.load(file)
 
-    # Print or use the data
-    print(f"data: {data}")
+    # # Print or use the data
+    # print(f"data: {data}")
  
 
 
