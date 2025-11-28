@@ -180,8 +180,9 @@ class Tortuosity(PhaseDescriptor):
             # microstructure ms where the searched for phase is represented as True, else False.
             # For further calculations, use ms_phase_of_interest:
             
-            desired_shape =tuple(ms.shape[1:-1])
-            ms = tf.reshape(ms, desired_shape).numpy()
+            if (len(ms.shape) > 3): # if called from mcrpy (would be a 4 or 5D tensor). If an microstructure is already 2 or 3D, don't change it.
+                desired_shape =tuple(ms.shape[1:-1])
+                ms = tf.reshape(ms, desired_shape).numpy()
             
             ms_phase_of_interest = ms == phase_of_interest
             
@@ -221,7 +222,7 @@ if __name__=="__main__":
 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    # ms = np.load(minimal_example_ms)
+    ms = np.load(minimal_example_ms)
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
@@ -244,21 +245,21 @@ if __name__=="__main__":
 #     # ms = np.random.randint(2, size=(3, 3, 3))
 #     # print(f'ms: {ms}, size: {ms.size}')
 
-    # tortuosity_descriptor = Tortuosity()
-    # singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+    tortuosity_descriptor = Tortuosity()
+    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    # mean_tort = singlephase_descriptor(ms)
-    # print('\n -----------------------------')
-    # print(f'Mean tortuosity value: {mean_tort}')
+    mean_tort = singlephase_descriptor(ms)
+    print('\n -----------------------------')
+    print(f'Mean tortuosity value: {mean_tort}')
 
 
     # Step 2: Open the pickle file
-    result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
-    pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_32x32_characterization.pickle')
-    with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
-        # Step 3: Load the data
-        data = pickle.load(file)
-    print(f"data: {data}")
+    # result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
+    # pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_32x32_characterization.pickle')
+    # with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
+    #     # Step 3: Load the data
+    #     data = pickle.load(file)
+    # print(f"data: {data}")
  
 
 
