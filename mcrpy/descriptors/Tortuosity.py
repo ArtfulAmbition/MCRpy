@@ -191,9 +191,12 @@ class Tortuosity(PhaseDescriptor):
             elif method == 'SSPSM':  
                 mean_tortuosity = SSPSM(ms_phase_of_interest)
 
-            return tf.cast(tf.constant(mean_tortuosity), tf.float64)
+            return tf.cast(tf.constant(mean_tortuosity), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
+    @staticmethod
+    def make_multiphase_descriptor():
+        return 0
 
 def register() -> None:
     descriptor_factory.register("Tortuosity", Tortuosity)
@@ -205,6 +208,8 @@ if __name__=="__main__":
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
+    #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
+
     # minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
 
     # for filename in os.listdir(folder):
@@ -222,6 +227,7 @@ if __name__=="__main__":
 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    
     ms = np.load(minimal_example_ms)
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
@@ -245,12 +251,7 @@ if __name__=="__main__":
 #     # ms = np.random.randint(2, size=(3, 3, 3))
 #     # print(f'ms: {ms}, size: {ms.size}')
 
-    tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    mean_tort = singlephase_descriptor(ms)
-    print('\n -----------------------------')
-    print(f'Mean tortuosity value: {mean_tort}')
 
 
     # Step 2: Open the pickle file
@@ -262,4 +263,13 @@ if __name__=="__main__":
     # print(f"data: {data}")
  
 
+##------------------------------------------------------------------
+   
+    tortuosity_descriptor = Tortuosity()
+    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
+    mean_tort = singlephase_descriptor(ms)
+    print('\n -----------------------------')
+    print(f'Mean tortuosity value: {mean_tort}')
+
+##------------------------------------------------------------------
