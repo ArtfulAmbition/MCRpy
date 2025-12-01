@@ -34,7 +34,7 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 6, # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
@@ -55,8 +55,11 @@ class Tortuosity(PhaseDescriptor):
             coordinates_np = coordinates.numpy()
 
             nodes = map(tuple,coordinates_np) # creating a vector of node tuples for insertion to nx.Graph()
-            
             graph = nx.Graph()
+
+            if not nodes:
+                return graph #if no nodes are found, return empty graph
+
             graph.add_nodes_from(nodes)             
             
             dimensionality = len(ms_phase_of_interest.shape)
@@ -65,7 +68,9 @@ class Tortuosity(PhaseDescriptor):
 
             assert connectivity in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
             #--------- connect nodes for connectivity=6 implemented for 2D and 3D: -----------------
-            if (connectivity in ['sides', 6, 4]) or (connectivity in ['edges', 4] and dimensionality == 2):
+            if ((connectivity in ['sides', 6] and dimensionality == 3) or 
+                (connectivity in ['sides', 4] and dimensionality == 2) or
+                (connectivity in ['edges', 4] and dimensionality == 2)):
                 def increment_direction(direction_tuple, index, val):
                     new_direction = np.copy(direction_tuple)
                     new_direction[index] += val
@@ -94,7 +99,7 @@ class Tortuosity(PhaseDescriptor):
                 directions = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
                       (1, 1), (-1, 1), (1, -1), (-1, -1)])  
             else:
-                raise Exception("Connectivity argument and dimensionality mismatch! Valid arguments for 3D are ['sides', 'edges, 'corners', 6, 18, 28] and for 2D ['sides', 'edges, 'corners', 4, 8],  Valid inputs are 'sides', 'edges, 'corners' 4, 6, 8, 18 26.")
+                raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
 
             graph_nodes = np.array(list(graph.nodes))  # Convert to np.array for vectorized operations
             edges_to_add = []  # List to store edges before adding
@@ -132,6 +137,8 @@ class Tortuosity(PhaseDescriptor):
             #create the graph for phase_of_interest
             graph:nx.Graph = ms_to_graph(ms_phase_of_interest)
             node_array:np.ndarray = np.array(graph.nodes)
+            if len(node_array) == 0:
+                return np.float64(0)
 
             #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
             # and the target nodes (to which the shortest path is searched for)
@@ -207,10 +214,12 @@ if __name__=="__main__":
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
+    #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
+    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+
     #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
 
-    # minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
+    #minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
 
     # for filename in os.listdir(folder):
     #     if filename.endswith('.npy'):  # Check if the file has a .npy extension
