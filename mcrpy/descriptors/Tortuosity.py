@@ -34,7 +34,7 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 6, # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
@@ -187,8 +187,11 @@ class Tortuosity(PhaseDescriptor):
             # microstructure ms where the searched for phase is represented as True, else False.
             # For further calculations, use ms_phase_of_interest:
             
-            if (len(ms.shape) > 3): # if called from mcrpy (would be a 4 or 5D tensor). If an microstructure is already 2 or 3D, don't change it.
-                desired_shape =tuple(ms.shape[1:-1])
+            if (len(ms.shape) > 3): # if called from mcrpy (would be a 4D tensor). If an microstructure is already 2 or 3D, don't change it.
+                if ms.shape[0]==1: #if the microstructure is 2D
+                    desired_shape =tuple(ms.shape[1:-1])
+                else: #if the microstructure is 3D
+                    desired_shape =tuple(ms.shape[0:-1])
                 ms = tf.reshape(ms, desired_shape).numpy()
             
             ms_phase_of_interest = ms == phase_of_interest
