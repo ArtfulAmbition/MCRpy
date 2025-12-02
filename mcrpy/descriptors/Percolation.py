@@ -33,11 +33,97 @@ class Percolation(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = 1, #for which phase number the tortuosity shall be calculated
+        direction : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
+        phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
         **kwargs) -> callable:
 
-        def percolation3D(ms_phase_of_interest: NDArray[np.bool_]):
+        def calculate_percolation(ms_phase_of_interest: NDArray[np.bool_]):
+
+            dimensionality = len(ms_phase_of_interest.shape)
+            assert dimensionality in [2,3] 
+
+            labeled_ms, n_labels = get_cluster(ms_phase_of_interest)
+
+            # labeled_ms is an np.ndarray of the size of ms. 
+            # It contains equal integer values for connected voxels of interest (cluster).
+            # The function checks, if there is a connection between the sides of the ms in the prescribed direction.
+            # This is the case, if there are the same cluster labels in labeled_ms at both relevant sides
+
+            # Generate the appropriate slices based on dimensionality and direction
+            slices_source = [slice(None)] * dimensionality  # Initialize a list of slices
+            slices_target = [slice(None)] * dimensionality  # Initialize a list of slices
+            slices_source[direction] =  0        # First layer
+            slices_target[direction] = -1        # Last layer
+
+            # Extract the source and target node labels using the dynamically created slices
+            source_node_labels = np.unique(labeled_ms[tuple(slices_source)])
+            target_node_labels = np.unique(labeled_ms[tuple(slices_target)])
+
+            # Exclude the zero from source- and target_node_labels, since zero represents phases which are not of interest
+            source_node_labels = source_node_labels[source_node_labels != 0]
+            target_node_labels = target_node_labels[target_node_labels != 0]
+            
+            #Check which labels are present at the source and the target surface / edge
+            labels_at_both_surface_and_target = np.intersect1d(source_node_labels, target_node_labels)
+
+            boolean_mask = np.isin(labeled_ms, labels_at_both_surface_and_target)
+            n_connected_voxels:int = np.count_nonzero(boolean_mask)
+
+            # print(f'labels_at_bot_sides: {labels_at_both_surface_and_target}')
+            # print(f'n_pixels: {n_connected_voxels}')
+            # print(f'boolean_mask: {boolean_mask}')
+
+            #Check for cluster labels which are present on all sides:
+            # Accessing outer borders
+            if dimensionality == 2:
+                labels_at_borders = np.unique(
+                    np.concatenate((
+                    labeled_ms[0,:].flatten(),
+                    labeled_ms[-1,:].flatten(),
+                    labeled_ms[:,0].flatten(),
+                    labeled_ms[:,-1].flatten(),
+                )))
+            else: # dimensionality == 3
+                labels_at_borders = np.unique(
+                    np.concatenate((
+                    labeled_ms[0, :, :].flatten(),       
+                    labeled_ms[-1, :, :].flatten(),     
+                    labeled_ms[:, 0, :].flatten(),       
+                    labeled_ms[:, -1, :].flatten(),      
+                    labeled_ms[:, :, 0].flatten(),       
+                    labeled_ms[:, :, -1].flatten()       
+                )))
+
+            # print(f'labels_at_borders: {labels_at_borders}')
+            #Extract labels, which are only present on the sides which are not of interest
+            labels_only_at_other_surfaces = list(set(labels_at_borders) - set(labels_at_both_surface_and_target))
+            # Exclude the zero from source- and target_node_labels, since zero represents phases which are not of interest
+            labels_only_at_other_surfaces = [label for label in labels_only_at_other_surfaces if label != 0]
+            #Count the number of respective voxels
+            boolean_mask = np.isin(labeled_ms, labels_only_at_other_surfaces)
+            n_unknown_voxels = np.count_nonzero(boolean_mask)
+
+            # Find the voxels, which are not connected to the borders (isolated):
+            isolated_labels = [label for label in range(n_labels) if label not in labels_at_borders]
+            #Count the number of respective voxels
+            boolean_mask = np.isin(labeled_ms, isolated_labels)
+            n_isolated_voxels = np.count_nonzero(boolean_mask)
+
+            # print(f'isolated_labels: {isolated_labels}')
+            # print(f'n_unknown_voxels: {n_unknown_voxels}')
+
+            total_number_voxels = np.size(ms_phase_of_interest)
+
+            fraction_connected_voxels = n_connected_voxels / total_number_voxels
+            fraction_isolated_voxels = n_isolated_voxels / total_number_voxels
+            fraction_unknown_voxels = n_unknown_voxels / total_number_voxels
+
+            print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}')
+
+            return fraction_connected_voxels, fraction_isolated_voxels, fraction_unknown_voxels
+
+
+        def get_cluster(ms_phase_of_interest: NDArray[np.bool_]):
             
             dimensionality = len(ms_phase_of_interest.shape)
             assert dimensionality in [2,3] 
@@ -86,22 +172,18 @@ class Percolation(PhaseDescriptor):
                 connectivity_structure[tuple(ind)] = 1 
 
 
-            print(f'shape ms_phase_of_interest: {ms_phase_of_interest.shape}')
-            print(f'connectivity_structure: {connectivity_structure}')
-            print(f'shape of connectivity_structure: {connectivity_structure.shape}')
+            # print(f'shape ms_phase_of_interest: {ms_phase_of_interest.shape}')
+            # print(f'connectivity_structure: {connectivity_structure}')
+            # print(f'shape of connectivity_structure: {connectivity_structure.shape}')
             
             print(f'ms_phase_of_interest: {ms_phase_of_interest}')
-            array_labeled, n_labels = label(ms_phase_of_interest, structure=connectivity_structure)
+            labeled_ms, n_labels = label(ms_phase_of_interest, structure=connectivity_structure)
 
-            print(f'array_labeled: {array_labeled}')
-            print(f'n_labels: {n_labels}')
+            print(f'array_labeled: {labeled_ms}')
+            # print(f'n_labels: {n_labels}')
 
-            fraction_connected_voxels = 0 
-            fraction_isolated_voxels = 0
-            fraction_unknown_voxels = 0
-            return fraction_connected_voxels, fraction_isolated_voxels, fraction_unknown_voxels
-
-
+            return labeled_ms, n_labels
+            
 
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
@@ -117,9 +199,14 @@ class Percolation(PhaseDescriptor):
                     desired_shape =tuple(ms.shape[0:-1])
                 ms = tf.reshape(ms, desired_shape).numpy()
             
+            assert isinstance(phase_of_interest, (int, list))
+
+            # if isinstance(phase_of_interest, int): # Ensure that phase of interest is a list
+            #     phase_of_interest = [phase_of_interest]
+
             ms_phase_of_interest = ms == phase_of_interest
             
-            fraction_connected_voxels, fraction_isolated_voxels, fraction_unknown_voxels = percolation3D(ms_phase_of_interest)
+            fraction_connected_voxels, fraction_isolated_voxels, fraction_unknown_voxels = calculate_percolation(ms_phase_of_interest)
 
             return tf.cast(tf.constant(fraction_connected_voxels), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
@@ -168,6 +255,10 @@ if __name__=="__main__":
 
     ms = np.zeros((3, 3, 3))
     ms[1,:, :] = 1
+
+    ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
+
+
 
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
