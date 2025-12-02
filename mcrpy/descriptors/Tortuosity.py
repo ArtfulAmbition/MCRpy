@@ -75,20 +75,20 @@ class Tortuosity(PhaseDescriptor):
                     new_direction = np.copy(direction_tuple)
                     new_direction[index] += val
                     return tuple(new_direction)
-                directions=np.zeros(dimensionality)
-                directions = np.array([increment_direction(directions, index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
+                connectivity_structure=np.zeros(dimensionality)
+                connectivity_structure = np.array([increment_direction(connectivity_structure, index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
                 # old code:
                 # if connectivity == 6:
                 #     directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)])
 
             elif connectivity in ['edges', 18] and dimensionality == 3:
-                directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
+                connectivity_structure = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                             (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                             (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                             (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)])
                                 
             elif connectivity in ['corners', 26] and dimensionality == 3:
-                directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
+                connectivity_structure = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                       (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                       (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                       (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
@@ -96,7 +96,7 @@ class Tortuosity(PhaseDescriptor):
                       (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)])  
             
             elif connectivity in ['corners', 8] and dimensionality == 2:
-                directions = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
+                connectivity_structure = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
                       (1, 1), (-1, 1), (1, -1), (-1, -1)])  
             else:
                 raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
@@ -107,7 +107,7 @@ class Tortuosity(PhaseDescriptor):
             i = 0
             for node in graph.nodes:
                 #x, y, z = node
-                neighbors = node + directions #find all neighbors by coordinates
+                neighbors = node + connectivity_structure #find all neighbors by coordinates
                 #valid_neighbors = neighbors[np.isin(neighbors, graph_nodes).all(axis=1)] #extract the  neighbors which are of the same phase
                 # Use broadcasting to create a mask of valid neighbors
                 
