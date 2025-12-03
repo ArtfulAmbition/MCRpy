@@ -39,7 +39,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 1, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [1], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -201,7 +201,7 @@ class Tortuosity(PhaseDescriptor):
             ms_phase_of_interest:np.ndarray[bool] = np.isin(ms, phase_of_interest_list)
             #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
 
-            if 1==1:
+            if 1==2:
                 labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
                 ms_connected_phase_of_interest, _ = get_connected_phases_of_interest(labeled_ms, direction)
                 ms_phase_of_interest = ms_connected_phase_of_interest
@@ -229,8 +229,8 @@ if __name__=="__main__":
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+    #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
 
     #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
 
@@ -256,13 +256,13 @@ if __name__=="__main__":
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
-    # print(f'shape: {ms.shape}')
+    
     # print(np.unique(ms))
 
 
-    ms = np.zeros((3, 3, 3))
-    ms[1,:,:] = 1
-    ms[2,:,:] = 2
+    # ms = np.zeros((3, 3, 3))
+    # ms[1,:,:] = 1
+    # ms[2,:,:] = 2
 #     # print(f'ms: {ms}')
 #     # print(f'shape: {(ms.shape)}')
 #     # print(f'ms type: {type(ms)}, size: {ms.size}')
@@ -273,8 +273,9 @@ if __name__=="__main__":
 #     print(f'shape: {(ms.shape)}')
 #     print(f'ms type: {type(ms)}, size: {ms.size}')
 
-#     # ms = np.random.randint(2, size=(3, 3, 3))
-#     # print(f'ms: {ms}, size: {ms.size}')
+    np.random.seed(10)
+    ms = np.random.randint(2, size=(30,30,30))
+    #print(f'ms: {ms}, size: {ms.size}')
 
 
 
@@ -286,7 +287,7 @@ if __name__=="__main__":
     #     # Step 3: Load the data
     #     data = pickle.load(file)
     # print(f"data: {data}")
- 
+    print(f'ms.shape: {ms.shape}')
 
 ##------------------------------------------------------------------
    

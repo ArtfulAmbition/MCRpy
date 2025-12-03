@@ -101,10 +101,10 @@ def get_labeled_ms(ms_phase_of_interest: NDArray[np.bool_], connectivity='sides'
             # print(f'connectivity_structure: {connectivity_structure}')
             # print(f'shape of connectivity_structure: {connectivity_structure.shape}')
             
-            print(f'ms_phase_of_interest: {ms_phase_of_interest}')
+            #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
             labeled_ms, n_labels = label(ms_phase_of_interest, structure=connectivity_structure)
 
-            print(f'array_labeled: {labeled_ms}')
+            #print(f'array_labeled: {labeled_ms}')
             # print(f'n_labels: {n_labels}')
 
             return labeled_ms, n_labels
