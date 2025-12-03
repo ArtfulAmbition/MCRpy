@@ -199,6 +199,9 @@ class Tortuosity(PhaseDescriptor):
                 phase_of_interest_list = phase_of_interest
             
             ms_phase_of_interest:np.ndarray[bool] = np.isin(ms, phase_of_interest_list)
+            if not ms_phase_of_interest.any():
+                return tf.cast(tf.constant(0), tf.float64)
+            
             #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
 
             # optional: reducing the number of voxels to check by only considering cluster which 
