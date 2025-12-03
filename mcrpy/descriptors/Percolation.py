@@ -34,7 +34,7 @@ class Percolation(PhaseDescriptor):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         direction : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [0.1], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = 0, #for which phase number(s) the tortuosity shall be calculated
         **kwargs) -> callable:
 
         def calculate_percolation(ms_phase_of_interest: NDArray[np.bool_]):
@@ -208,7 +208,7 @@ class Percolation(PhaseDescriptor):
                     desired_shape =tuple(ms.shape[0:-1])
                 ms = tf.reshape(ms, desired_shape).numpy()
             
-            assert isinstance(phase_of_interest, (int, list[int])), "type error: phase_of_interest must be an integer or a list of integers"
+            assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
 
             if isinstance(phase_of_interest, int): # Ensure that phase_of_interest is a list
                 phase_of_interest_list = [phase_of_interest]

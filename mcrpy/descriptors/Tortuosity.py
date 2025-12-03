@@ -40,7 +40,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [0,1], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
