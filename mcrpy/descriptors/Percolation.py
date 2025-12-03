@@ -34,13 +34,13 @@ class Percolation(PhaseDescriptor):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         direction : Union[int,list[int]] = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [0.1], #for which phase number the tortuosity shall be calculated
         **kwargs) -> callable:
 
         def calculate_percolation(ms_phase_of_interest: NDArray[np.bool_]):
 
             dimensionality = len(ms_phase_of_interest.shape)
-            assert dimensionality in [2,3] 
+            assert dimensionality in [2,3] # only 2 and 3D microstructures
 
             labeled_ms, n_labels = get_cluster(ms_phase_of_interest)
 
@@ -66,8 +66,8 @@ class Percolation(PhaseDescriptor):
             #Check which labels are present at the source and the target surface / edge
             labels_at_both_surface_and_target = np.intersect1d(source_node_labels, target_node_labels)
 
-            boolean_mask = np.isin(labeled_ms, labels_at_both_surface_and_target)
-            n_connected_voxels:int = np.count_nonzero(boolean_mask)
+            boolean_mask_connected = np.isin(labeled_ms, labels_at_both_surface_and_target)
+            n_connected_voxels:int = np.count_nonzero(boolean_mask_connected)
 
             # print(f'labels_at_bot_sides: {labels_at_both_surface_and_target}')
             # print(f'n_pixels: {n_connected_voxels}')
@@ -94,20 +94,22 @@ class Percolation(PhaseDescriptor):
                     labeled_ms[:, :, -1].flatten()       
                 )))
 
-            # print(f'labels_at_borders: {labels_at_borders}')
-            #Extract labels, which are only present on the sides which are not of interest
+            #Extract labels, which are ONLY present on the sides which are NOT of interest (not in the specified_direction)
             labels_only_at_other_surfaces = list(set(labels_at_borders) - set(labels_at_both_surface_and_target))
-            # Exclude the zero from source- and target_node_labels, since zero represents phases which are not of interest
-            labels_only_at_other_surfaces = [label for label in labels_only_at_other_surfaces if label != 0]
-            #Count the number of respective voxels
-            boolean_mask = np.isin(labeled_ms, labels_only_at_other_surfaces)
-            n_unknown_voxels = np.count_nonzero(boolean_mask)
+            labels_only_at_other_surfaces = [label for label in labels_only_at_other_surfaces if label != 0]  # Exclude the zero (zero represents phases which are not of interest)
 
-            # Find the voxels, which are not connected to the borders (isolated):
+            #Count the number of respective voxels
+            boolean_mask_unknown = np.isin(labeled_ms, labels_only_at_other_surfaces)
+            n_unknown_voxels = np.count_nonzero(boolean_mask_unknown)
+
+            # Find the voxels, which are not connected to the borders (isolated clusters):
             isolated_labels = [label for label in range(n_labels) if label not in labels_at_borders]
             #Count the number of respective voxels
-            boolean_mask = np.isin(labeled_ms, isolated_labels)
-            n_isolated_voxels = np.count_nonzero(boolean_mask)
+            boolean_mask_isolated = np.isin(labeled_ms, isolated_labels)
+            n_isolated_voxels = np.count_nonzero(boolean_mask_isolated)
+
+            # Find and count the voxels of phases which are not of interest
+            n_voxels_not_of_interest = np.count_nonzero(labeled_ms==0)
 
             # print(f'isolated_labels: {isolated_labels}')
             # print(f'n_unknown_voxels: {n_unknown_voxels}')
@@ -117,10 +119,18 @@ class Percolation(PhaseDescriptor):
             fraction_connected_voxels = n_connected_voxels / total_number_voxels
             fraction_isolated_voxels = n_isolated_voxels / total_number_voxels
             fraction_unknown_voxels = n_unknown_voxels / total_number_voxels
+            fraction_voxels_without_phase_of_interest = n_voxels_not_of_interest / total_number_voxels
 
-            print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}')
+            print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
 
-            return fraction_connected_voxels, fraction_isolated_voxels, fraction_unknown_voxels
+            percolation_info_dict = {'connected': fraction_connected_voxels, 
+                                'isolated': fraction_isolated_voxels,
+                                'unknown': fraction_unknown_voxels,
+                                'not_phase_of_interest': fraction_voxels_without_phase_of_interest}
+
+            is_percolating:np.bool_ = (fraction_connected_voxels > 0)
+
+            return fraction_connected_voxels, is_percolating, percolation_info_dict
 
 
         def get_cluster(ms_phase_of_interest: NDArray[np.bool_]):
@@ -187,7 +197,6 @@ class Percolation(PhaseDescriptor):
 
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            
             # ms_phase_of_interest is an np.ndarray with bool values representing the 
             # microstructure ms where the searched for phase is represented as True, else False.
             # For further calculations, use ms_phase_of_interest:
@@ -199,14 +208,17 @@ class Percolation(PhaseDescriptor):
                     desired_shape =tuple(ms.shape[0:-1])
                 ms = tf.reshape(ms, desired_shape).numpy()
             
-            assert isinstance(phase_of_interest, (int, list))
+            assert isinstance(phase_of_interest, (int, list[int])), "type error: phase_of_interest must be an integer or a list of integers"
 
-            # if isinstance(phase_of_interest, int): # Ensure that phase of interest is a list
-            #     phase_of_interest = [phase_of_interest]
+            if isinstance(phase_of_interest, int): # Ensure that phase_of_interest is a list
+                phase_of_interest_list = [phase_of_interest]
+            else:
+                assert all(isinstance(item, int) for item in phase_of_interest), "type error: phase_of_interest must be an integer or a list of integers"
+                phase_of_interest_list = phase_of_interest
 
-            ms_phase_of_interest = ms == phase_of_interest
+            ms_phase_of_interest = np.isin(ms, phase_of_interest_list)
             
-            fraction_connected_voxels, fraction_isolated_voxels, fraction_unknown_voxels = calculate_percolation(ms_phase_of_interest)
+            fraction_connected_voxels, is_percolating, percolation_info_dict = calculate_percolation(ms_phase_of_interest)
 
             return tf.cast(tf.constant(fraction_connected_voxels), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
