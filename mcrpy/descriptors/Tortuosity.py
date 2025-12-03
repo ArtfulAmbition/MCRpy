@@ -201,11 +201,12 @@ class Tortuosity(PhaseDescriptor):
             ms_phase_of_interest:np.ndarray[bool] = np.isin(ms, phase_of_interest_list)
             #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
 
-            if 1==2:
-                labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
-                ms_connected_phase_of_interest, _ = get_connected_phases_of_interest(labeled_ms, direction)
-                ms_phase_of_interest = ms_connected_phase_of_interest
-                #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
+            # optional: reducing the number of voxels to check by only considering cluster which 
+            # go from one side to another: 
+            labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
+            ms_connected_phase_of_interest, _ = get_connected_phases_of_interest(labeled_ms, direction)
+            ms_phase_of_interest = ms_connected_phase_of_interest
+
 
             assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
             if method == 'DSPSM':  
