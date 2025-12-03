@@ -38,9 +38,9 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         directions : Union[int,list[int]] = 1, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = 0, #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [0,1], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -177,7 +177,9 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
+            print(f'ms_phase_of_interest: {ms_phase_of_interest}')
             skeleton_ms = skeletonize(ms_phase_of_interest)
+            print(f'skeleton_ms: {skeleton_ms}')
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
         #@tf.function
@@ -194,8 +196,18 @@ class Tortuosity(PhaseDescriptor):
                     desired_shape =tuple(ms.shape[0:-1])
                 ms = tf.reshape(ms, desired_shape).numpy()
             
-            ms_phase_of_interest = ms == phase_of_interest
+            assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
+
+            if isinstance(phase_of_interest, int): # Ensure that phase_of_interest is a list
+                phase_of_interest_list = [phase_of_interest]
+            else:
+                assert all(isinstance(item, int) for item in phase_of_interest), "type error: phase_of_interest must be an integer or a list of integers"
+                phase_of_interest_list = phase_of_interest
             
+            ms_phase_of_interest = np.isin(ms, phase_of_interest_list)
+            print(f'ms_phase_of_interest: {ms_phase_of_interest}')
+
+            assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
             if method == 'DSPSM':  
                 mean_tortuosity = DSPSM(ms_phase_of_interest)
             elif method == 'SSPSM':  
@@ -217,8 +229,8 @@ if __name__=="__main__":
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
-    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
+    #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
 
     #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
 
@@ -240,7 +252,7 @@ if __name__=="__main__":
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
-    ms = np.load(minimal_example_ms)
+    #ms = np.load(minimal_example_ms)
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
@@ -248,8 +260,9 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
-#     # ms = np.zeros((3, 3, 3))
-#     # ms[1,:,:] = 1
+    ms = np.zeros((3, 3, 3))
+    ms[1,:,:] = 1
+    ms[2,:,:] = 2
 #     # print(f'ms: {ms}')
 #     # print(f'shape: {(ms.shape)}')
 #     # print(f'ms type: {type(ms)}, size: {ms.size}')
