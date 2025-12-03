@@ -147,14 +147,22 @@ class Tortuosity(PhaseDescriptor):
                 #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return np.float64(0)
 
-            def calculate_path_length(graph, source_nodes, target_node):
-                try:
-                    return nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=target_node)[0] 
-                except:
-                    return None
+            # Compute distances from all source nodes at once (single multi-source Dijkstra)
+            try:
+                dist_dict, _ = nx.multi_source_dijkstra(G=graph, sources=source_nodes)
+            except Exception:
+                # Fallback: try individual target computations (rare)
+                dist_dict = {}
+                for t in target_nodes:
+                    try:
+                        length = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=t)[0]
+                        if length is not None:
+                            dist_dict[t] = length
+                    except Exception:
+                        continue
 
-            len_first_voxel_in_direction = voxel_dimension[direction] # needs to be added to each path length, because the length of the length of the source voxels are omitted when calculation the path lenght via a graph. 
-            path_length_list = [length + len_first_voxel_in_direction for target_node in target_nodes if (length := calculate_path_length(graph, source_nodes, target_node)) is not None]
+            len_first_voxel_in_direction = voxel_dimension[direction]  # add length of first voxel
+            path_length_list = [dist_dict[target] + len_first_voxel_in_direction for target in target_nodes if target in dist_dict]
 
             if not path_length_list:
                 #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
