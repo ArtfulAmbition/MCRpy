@@ -42,11 +42,23 @@ class Tortuosity(PhaseDescriptor):
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
-        voxel_dimension:tuple[float] =(1,1,1),
+        voxel_dimension:tuple[float] =(-1,1,1),
         **kwargs) -> callable:
 
+        assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
+        assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
+        assert direction in [0,1,2], "Input error. Valid inputs for direction are 0, 1, 2 (x,y,z)"
+        assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
+        assert isinstance(voxel_dimension,tuple)
+        assert all([val>0 for val in voxel_dimension]), "Only positive values for the voxel dimensions are permitted."
+
         def get_connectivity_directions(dimensionality: int):
-            assert connectivity in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
+            ''' connectivity_directions describes the connectivity for both directions (to and from a node pair) in the different directions, 
+                that means for example for (1,0) but also for (-1,0). 
+                This can lead to inefficencies in the code. 
+                In the current code, the negative direction is implicitly included by making the calculation unidirective.
+                for this, only one direction is needed (one_way_connectivity_directions)
+            '''
             if ((connectivity in ['sides', 6] and dimensionality == 3) or 
                 (connectivity in ['sides', 4] and dimensionality == 2) or
                 (connectivity in ['edges', 4] and dimensionality == 2)):
@@ -54,7 +66,8 @@ class Tortuosity(PhaseDescriptor):
                     new_direction = np.copy(direction_tuple)
                     new_direction[index] += val
                     return tuple(new_direction)
-                connectivity_directions = np.array([increment_direction(np.zeros(dimensionality), index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
+                connectivity_directions = np.array([increment_direction(np.zeros(dimensionality), index, val) 
+                                                    for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
             elif connectivity in ['edges', 18] and dimensionality == 3:
                 connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                             (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
@@ -72,14 +85,6 @@ class Tortuosity(PhaseDescriptor):
                       (1, 1), (-1, 1), (1, -1), (-1, -1)])
             else:
                 raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
-            
-            full_connectivity_directions = connectivity_directions 
-           
-            # full_connectivity_directions describes the connectivity for both directions (to and from a node pair), 
-            # that means for example for (1,0) but also for (-1,0). 
-            # This can lead to inefficencies in the code. 
-            # In the current code, the negative direction is implicitly included by making the calculation unidirective.
-            # for this, only one direction is needed (one_way_connectivity_directions):
 
             # Create a mask where all values are non-negative and filter the array using the mask
             mask = np.all(connectivity_directions >= 0, axis=1)
@@ -217,9 +222,7 @@ class Tortuosity(PhaseDescriptor):
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             
-            # ms_phase_of_interest is an np.ndarray with bool values representing the 
-            # microstructure ms where the searched for phase is represented as True, else False.
-            # For further calculations, use ms_phase_of_interest:
+            
             
             if (len(ms.shape) > 3): # if called from mcrpy (would be a 4D tensor). If an microstructure is already 2 or 3D, don't change it.
                 if ms.shape[0]==1: #if the microstructure is 2D
@@ -228,28 +231,25 @@ class Tortuosity(PhaseDescriptor):
                     desired_shape =tuple(ms.shape[0:-1])
                 ms = tf.reshape(ms, desired_shape).numpy()
             
-            assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
-
-            if isinstance(phase_of_interest, int): # Ensure that phase_of_interest is a list
+            if isinstance(phase_of_interest, int):
                 phase_of_interest_list = [phase_of_interest]
             else:
                 assert all(isinstance(item, int) for item in phase_of_interest), "type error: phase_of_interest must be an integer or a list of integers"
                 phase_of_interest_list = phase_of_interest
             
-            ms_phase_of_interest:np.ndarray[bool] = np.isin(ms, phase_of_interest_list)
+            ms_phase_of_interest:np.ndarray[bool] = np.isin(ms, phase_of_interest_list) 
+                # ms_phase_of_interest is an np.ndarray with bool values representing the 
+                # microstructure ms where the searched for phase is represented as True, else False.
+                # For further calculations, use ms_phase_of_interest:
             if not ms_phase_of_interest.any():
                 return tf.cast(tf.constant(0), tf.float64)
             
-            #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
-
-            # optional: reducing the number of voxels to check by only considering cluster which 
+            # the following is optional: reducing the number of voxels to check by only considering cluster which 
             # go from one side to another: 
             labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
             ms_connected_phase_of_interest, _ = get_connected_phases_of_interest(labeled_ms, direction)
             ms_phase_of_interest = ms_connected_phase_of_interest
 
-
-            assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
             if method == 'DSPSM':  
                 mean_tortuosity = DSPSM(ms_phase_of_interest)
             elif method == 'SSPSM':  
