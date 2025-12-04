@@ -40,7 +40,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        direction : int = 1, #0:x, 1:y, 2:z
+        direction : int = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -72,7 +72,20 @@ class Tortuosity(PhaseDescriptor):
                       (1, 1), (-1, 1), (1, -1), (-1, -1)])
             else:
                 raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
-            return connectivity_directions
+            
+            full_connectivity_directions = connectivity_directions 
+           
+            # full_connectivity_directions describes the connectivity for both directions (to and from a node pair), 
+            # that means for example for (1,0) but also for (-1,0). 
+            # This can lead to inefficencies in the code. 
+            # In the current code, the negative direction is implicitly included by making the calculation unidirective.
+            # for this, only one direction is needed (one_way_connectivity_directions):
+
+            # Create a mask where all values are non-negative and filter the array using the mask
+            mask = np.all(connectivity_directions >= 0, axis=1)
+            one_way_connectivity_directions = connectivity_directions[mask]
+            
+            return one_way_connectivity_directions
 
 
         #@tf.function
@@ -136,7 +149,8 @@ class Tortuosity(PhaseDescriptor):
                 cols.extend(tgt_idx.tolist())
                 data.extend([weight] * len(src_idx))
 
-                # also add reverse direction for undirected graph
+                # also add reverse direction for undirected graph 
+                # (this should only be used if only one-way connections between voxels are considered)
                 rows.extend(tgt_idx.tolist())
                 cols.extend(src_idx.tolist())
                 data.extend([weight] * len(src_idx))
@@ -148,6 +162,8 @@ class Tortuosity(PhaseDescriptor):
             rows_m = [mapping[int(r)] for r in rows]
             cols_m = [mapping[int(c)] for c in cols]
 
+
+            # sparse matrix with data_val, rows, cols and shape args
             A = coo_matrix((np.array(data, dtype=np.float64), (np.array(rows_m), np.array(cols_m))), shape=(len(node_flat), len(node_flat))).tocsr()
 
             # identify source and target compact indices
@@ -276,9 +292,9 @@ if __name__=="__main__":
 
 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
-    #ms = np.load(minimal_example_ms)
+    ms = np.load(minimal_example_ms)
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
@@ -286,8 +302,9 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
-    ms = np.zeros((3, 3, 3))
-    #ms[1,:,:] = 1
+    # ms = np.zeros((6, 6))
+    # ms[1,:] = 1
+    # ms[1,5] = 0
     # ms[2,:,:] = 2
     print(f'ms: {ms}')
     print(f'shape: {(ms.shape)}')
@@ -299,8 +316,8 @@ if __name__=="__main__":
 #     print(f'shape: {(ms.shape)}')
 #     print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    # np.random.seed(10)
-    # ms = np.random.randint(2, size=(70,70,70))
+    np.random.seed(10)
+    ms = np.random.randint(2, size=(70,70,70))
     #print(f'ms: {ms}, size: {ms.size}')
 
 
