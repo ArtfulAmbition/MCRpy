@@ -28,6 +28,7 @@ from skimage.morphology import skeletonize
 from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_labeled_ms
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
+from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
@@ -42,7 +43,7 @@ class Tortuosity(PhaseDescriptor):
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
-        voxel_dimension:tuple[float] =(-1,1,1),
+        voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
         assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
@@ -52,47 +53,7 @@ class Tortuosity(PhaseDescriptor):
         assert isinstance(voxel_dimension,tuple)
         assert all([val>0 for val in voxel_dimension]), "Only positive values for the voxel dimensions are permitted."
 
-        def get_connectivity_directions(dimensionality: int):
-            ''' connectivity_directions describes the connectivity for both directions (to and from a node pair) in the different directions, 
-                that means for example for (1,0) but also for (-1,0). 
-                This can lead to inefficencies in the code. 
-                In the current code, the negative direction is implicitly included by making the calculation unidirective.
-                for this, only one direction is needed (one_way_connectivity_directions)
-            '''
-            if ((connectivity in ['sides', 6] and dimensionality == 3) or 
-                (connectivity in ['sides', 4] and dimensionality == 2) or
-                (connectivity in ['edges', 4] and dimensionality == 2)):
-                def increment_direction(direction_tuple, index, val):
-                    new_direction = np.copy(direction_tuple)
-                    new_direction[index] += val
-                    return tuple(new_direction)
-                connectivity_directions = np.array([increment_direction(np.zeros(dimensionality), index, val) 
-                                                    for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
-            elif connectivity in ['edges', 18] and dimensionality == 3:
-                connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-                            (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
-                            (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
-                            (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)])
-            elif connectivity in ['corners', 26] and dimensionality == 3:
-                connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-                      (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
-                      (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
-                      (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
-                      (1, 1, 1), (1, -1, 1), (-1, 1, 1), (-1, -1, 1),
-                      (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)])
-            elif connectivity in ['corners', 8] and dimensionality == 2:
-                connectivity_directions = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
-                      (1, 1), (-1, 1), (1, -1), (-1, -1)])
-            else:
-                raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
-
-            # Create a mask where all values are non-negative and filter the array using the mask
-            mask = np.all(connectivity_directions >= 0, axis=1)
-            one_way_connectivity_directions = connectivity_directions[mask]
-            
-            return one_way_connectivity_directions
-
-
+        
         #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
@@ -105,7 +66,7 @@ class Tortuosity(PhaseDescriptor):
             shape = ms_phase_of_interest.shape
             ndim = len(shape)
             # determine connectivity offsets for this dimensionality
-            connectivity_directions = get_connectivity_directions(ndim)
+            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity)
             idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) #each position gets an scalar idx
 
             # list of flat indices of nodes present

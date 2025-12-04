@@ -22,6 +22,8 @@ from numpy.typing import NDArray
 from typing import Union, Any, Tuple
 import numpy as np
 from scipy.ndimage import label
+from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
+
 
 def get_connected_phases_of_interest(labeled_ms: np.ndarray[int], direction:int=0) -> np.ndarray[bool]:
             
@@ -53,59 +55,15 @@ def get_labeled_ms(ms_phase_of_interest: NDArray[np.bool_], connectivity='sides'
             dimensionality = len(ms_phase_of_interest.shape)
             assert dimensionality in [2,3] 
 
-            # labeling of connected voxels with equal integers using scipy. 
-            # The scheme how connection is defined is governed by the structure argument.
-            # (default is connection via sides, so if structure == None)
-            # definition of possible connections:
-            assert connectivity in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
-            #--------- connect nodes for connectivity=6 implemented for 2D and 3D: -----------------
-            if ((connectivity in ['sides', 6] and dimensionality == 3) or 
-                (connectivity in ['sides', 4] and dimensionality == 2) or
-                (connectivity in ['edges', 4] and dimensionality == 2)):
-                def increment_direction(direction_tuple, index, val):
-                    new_direction = np.copy(direction_tuple)
-                    new_direction[index] += val
-                    return tuple(new_direction)
-                connectivity_directions=np.zeros(dimensionality)
-                connectivity_directions = np.array([increment_direction(connectivity_directions, index, val) for index in range(dimensionality) for val in [1, -1]], dtype=int)  # This creates both +1 and -1 increments
-               
-            elif connectivity in ['edges', 18] and dimensionality == 3:
-                connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-                            (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
-                            (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
-                            (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)], dtype=int)
-                                
-            elif connectivity in ['corners', 26] and dimensionality == 3:
-                connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-                      (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
-                      (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
-                      (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
-                      (1, 1, 1), (1, -1, 1), (-1, 1, 1), (-1, -1, 1),
-                      (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)], dtype=int)  
-            
-            elif connectivity in ['corners', 8] and dimensionality == 2:
-                connectivity_directions = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
-                      (1, 1), (-1, 1), (1, -1), (-1, -1)], dtype=int)  
-            else:
-                raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
-
+            connectivity_directions = get_connectivity_directions(dimensionality=dimensionality, connectivity=connectivity, mode="full")
             # convert connectivity_directions to a connectivity_structure as required in label function
             connectivity_structure = np.zeros((3,) * dimensionality, dtype=int)
-            connectivity_structure[(1,)*dimensionality] = 1 #center point also needs to be 1 in 2D and 3D
+            connectivity_structure[(1,)*dimensionality] = 1 #center point is always 1 in 2D and 3D
             for row in connectivity_directions:
                 ind = row + np.ones(dimensionality,dtype=int)
                 connectivity_structure[tuple(ind)] = 1 
 
-
-            # print(f'shape ms_phase_of_interest: {ms_phase_of_interest.shape}')
-            # print(f'connectivity_structure: {connectivity_structure}')
-            # print(f'shape of connectivity_structure: {connectivity_structure.shape}')
-            
-            #print(f'ms_phase_of_interest: {ms_phase_of_interest}')
             labeled_ms, n_labels = label(ms_phase_of_interest, structure=connectivity_structure)
-
-            #print(f'array_labeled: {labeled_ms}')
-            # print(f'n_labels: {n_labels}')
 
             return labeled_ms, n_labels
 
@@ -140,12 +98,8 @@ class Percolation(PhaseDescriptor):
 
             n_connected_voxels:int = np.count_nonzero(ms_connected_phase_of_interest)
 
-            # print(f'labels_at_bot_sides: {labels_at_both_surface_and_target}')
-            # print(f'n_pixels: {n_connected_voxels}')
-            # print(f'boolean_mask: {boolean_mask}')
-
-            #Check for cluster labels which are present on all sides:
-            # Accessing outer borders
+            ## Check for cluster labels which are present on all sides:
+            #Accessing outer borders
             if dimensionality == 2:
                 labels_at_borders = np.unique(
                     np.concatenate((
@@ -180,9 +134,6 @@ class Percolation(PhaseDescriptor):
 
             # Find and count the voxels of phases which are not of interest
             n_voxels_not_of_interest = np.count_nonzero(labeled_ms==0)
-
-            # print(f'isolated_labels: {isolated_labels}')
-            # print(f'n_unknown_voxels: {n_unknown_voxels}')
 
             total_number_voxels = np.size(ms_phase_of_interest)
 
