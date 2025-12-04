@@ -25,7 +25,9 @@ from numpy.typing import NDArray
 from typing import Any, Union
 import numpy as np
 from skimage.morphology import skeletonize
-from Percolation import get_connected_phases_of_interest, get_labeled_ms
+from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_labeled_ms
+from scipy.sparse import coo_matrix
+from scipy.sparse.csgraph import dijkstra as sp_dijkstra
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
@@ -39,34 +41,12 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 1, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [1], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
-        #@tf.function
-        def ms_to_graph(ms_phase_of_interest: NDArray[np.bool_]) -> nx.Graph:
-            # connectivity: number of adjacent neighbors for which a connectivity should be allowed. Implemented possibilites are 6, 18 and 24
-            # voxel_dimension: the dimension (lx,ly,lz) of each considered voxel. Is needed to calculate the distance between neighbors
-            _voxel_dimension = voxel_dimension
-
-            #--------- create nodes for graph: ------------------
-            coordinates = tf.where(ms_phase_of_interest) # getting the coordinates of voxels with phase id equal to phase_to_investigate
-            coordinates_np = coordinates.numpy()
-
-            nodes = map(tuple,coordinates_np) # creating a vector of node tuples for insertion to nx.Graph()
-            graph = nx.Graph()
-
-            if not nodes:
-                return graph #if no nodes are found, return empty graph
-
-            graph.add_nodes_from(nodes)             
-            
-            dimensionality = len(ms_phase_of_interest.shape)
-            _voxel_dimension = _voxel_dimension[:dimensionality] # omit voxel dimensions, which don't fit to the given microstructure dimensionality
-
-
+        def get_connectivity_directions(dimensionality: int):
             assert connectivity in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
-            #--------- connect nodes for connectivity=6 implemented for 2D and 3D: -----------------
             if ((connectivity in ['sides', 6] and dimensionality == 3) or 
                 (connectivity in ['sides', 4] and dimensionality == 2) or
                 (connectivity in ['edges', 4] and dimensionality == 2)):
@@ -74,104 +54,138 @@ class Tortuosity(PhaseDescriptor):
                     new_direction = np.copy(direction_tuple)
                     new_direction[index] += val
                     return tuple(new_direction)
-                connectivity_directions=np.zeros(dimensionality)
-                connectivity_directions = np.array([increment_direction(connectivity_directions, index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
-                
+                connectivity_directions = np.array([increment_direction(np.zeros(dimensionality), index, val) for index in range(dimensionality) for val in [1, -1]])  # This creates both +1 and -1 increments
             elif connectivity in ['edges', 18] and dimensionality == 3:
                 connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                             (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                             (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                             (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)])
-                                
             elif connectivity in ['corners', 26] and dimensionality == 3:
                 connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                       (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                       (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                       (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
                       (1, 1, 1), (1, -1, 1), (-1, 1, 1), (-1, -1, 1),
-                      (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)])  
-            
+                      (1, 1, -1), (1, -1, -1), (-1, 1, -1), (-1, -1, -1)])
             elif connectivity in ['corners', 8] and dimensionality == 2:
                 connectivity_directions = np.array([(1, 0), (-1, 0), (0, 1), (0, -1),
-                      (1, 1), (-1, 1), (1, -1), (-1, -1)])  
+                      (1, 1), (-1, 1), (1, -1), (-1, -1)])
             else:
                 raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
-
-            graph_nodes = np.array(list(graph.nodes))  # Convert to np.array for vectorized operations
-            edges_to_add = []  # List to store edges before adding
-            
-            i = 0
-            for node in graph.nodes:
-                #x, y, z = node
-                neighbors = node + connectivity_directions #find all neighbors by coordinates
-                #valid_neighbors = neighbors[np.isin(neighbors, graph_nodes).all(axis=1)] #extract the  neighbors which are of the same phase
-                # Use broadcasting to create a mask of valid neighbors
-                
-                # Use broadcasting to check for matches
-                valid_neighbors_mask = np.any(np.all(neighbors[:, np.newaxis] == graph_nodes, axis=2), axis=1)
-                # Select valid neighbors based on the mask
-                valid_neighbors = neighbors[valid_neighbors_mask]
-
-                # calculating the distance to the neighbor:
-                normed_distance_vectors = valid_neighbors - node # unit vector differences between the current node to its valid neighbors 
-                
-                weighted_distance_vectors = normed_distance_vectors * [*_voxel_dimension] # weighted vector differences between the current node to its valid neighbors 
-                distances = np.linalg.norm(weighted_distance_vectors, axis=1)
-                                
-                edges_to_add.extend([(node, tuple(valid_neighbor), {'weight': distance}) for valid_neighbor, distance in zip(valid_neighbors, distances)])
-
-            graph.add_edges_from(edges_to_add)
-            return graph
+            return connectivity_directions
 
 
         #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
 
-            #create the graph for phase_of_interest
-            graph:nx.Graph = ms_to_graph(ms_phase_of_interest)
-            node_array:np.ndarray = np.array(graph.nodes)
-            if len(node_array) == 0:
+            # Quick exit if ms_phase_of_interest contains only False
+            if not ms_phase_of_interest.any():
                 return np.float64(0)
 
-            #identify the source nodes (from where the paths through the microstructure shall start, at minimum of coordinate in specified direction)
-            # and the target nodes (to which the shortest path is searched for)
-            idx_max_position_in_direction = ms_phase_of_interest.shape[direction] -1 #index of the voxels of the target surface in the specified direction
-            source_nodes_array = node_array[node_array[:, direction] == 0]            
-            target_nodes_array = node_array[node_array[:, direction] == idx_max_position_in_direction] 
-            source_nodes = [tuple(row) for row in source_nodes_array.tolist()] # Convert arrays back to former to list of tuples representation
-            target_nodes = [tuple(row) for row in target_nodes_array.tolist()] # Convert arrays back to former to list of tuples representation
+            # Build sparse adjacency between voxels of the phase using vectorized shifts
+            shape = ms_phase_of_interest.shape
+            ndim = len(shape)
+            # determine connectivity offsets for this dimensionality
+            connectivity_directions = get_connectivity_directions(ndim)
+            idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) #each position gets an scalar idx
 
-            #calculation of the shortest path from the source points to a single specified target node (compare nx.multi_source_dijkstra manual)
-            if (not target_nodes) or (not source_nodes):
-                #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
+            # list of flat indices of nodes present
+            node_coords = np.argwhere(ms_phase_of_interest)
+            if node_coords.size == 0:
+                return np.float64(0) # Quick exit if no nodes are present
+            node_flat = np.ravel_multi_index(node_coords.T, shape) #putting all coordinates into an array.
+            # mapping flat index -> compact index
+            mapping = {int(flat): i for i, flat in enumerate(node_flat)}
+
+            rows = []
+            cols = []
+            data = []
+
+            # iterate connectivity offsets
+            for off in connectivity_directions:
+                off = tuple(int(x) for x in off)
+                # compute slices for source and target to avoid wrap-around
+                src_slices = []
+                tgt_slices = []
+                for dim_idx, o in enumerate(off):
+                    if o > 0:
+                        src_slices.append(slice(0, shape[dim_idx] - o))
+                        tgt_slices.append(slice(o, shape[dim_idx]))
+                    elif o < 0:
+                        src_slices.append(slice(-o, shape[dim_idx]))
+                        tgt_slices.append(slice(0, shape[dim_idx] + o))
+                    else:
+                        src_slices.append(slice(0, shape[dim_idx]))
+                        tgt_slices.append(slice(0, shape[dim_idx]))
+                src_slices = tuple(src_slices)
+                tgt_slices = tuple(tgt_slices)
+
+                src_mask = ms_phase_of_interest[src_slices]
+                tgt_mask = ms_phase_of_interest[tgt_slices]
+                valid_mask = src_mask & tgt_mask
+                if not np.any(valid_mask):
+                    continue
+
+                src_idx = idx_grid[src_slices][valid_mask]
+                tgt_idx = idx_grid[tgt_slices][valid_mask]
+
+                weight = float(np.linalg.norm(np.array(off) * np.array(voxel_dimension[:ndim])))
+
+                rows.extend(src_idx.tolist())
+                cols.extend(tgt_idx.tolist())
+                data.extend([weight] * len(src_idx))
+
+                # also add reverse direction for undirected graph
+                rows.extend(tgt_idx.tolist())
+                cols.extend(src_idx.tolist())
+                data.extend([weight] * len(src_idx))
+
+            if len(rows) == 0:
                 return np.float64(0)
 
-            # Compute distances from all source nodes at once (single multi-source Dijkstra)
+            # map flat rows/cols to compact indices
+            rows_m = [mapping[int(r)] for r in rows]
+            cols_m = [mapping[int(c)] for c in cols]
+
+            A = coo_matrix((np.array(data, dtype=np.float64), (np.array(rows_m), np.array(cols_m))), shape=(len(node_flat), len(node_flat))).tocsr()
+
+            # identify source and target compact indices
+            idx_max_position_in_direction = shape[direction] - 1
+            source_mask_coords = node_coords[:, direction] == 0
+            target_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
+            if not np.any(source_mask_coords) or not np.any(target_mask_coords):
+                return np.float64(0)
+
+            source_compact = [mapping[int(f)] for f in node_flat[source_mask_coords]]
+            target_compact = [mapping[int(f)] for f in node_flat[target_mask_coords]]
+
+            # run multi-source dijkstra (compute distances from all sources)
             try:
-                dist_dict, _ = nx.multi_source_dijkstra(G=graph, sources=source_nodes)
+                dist_matrix = sp_dijkstra(csgraph=A, directed=False, indices=source_compact)
             except Exception:
-                # Fallback: try individual target computations (rare)
-                dist_dict = {}
-                for t in target_nodes:
-                    try:
-                        length = nx.multi_source_dijkstra(G=graph, sources=source_nodes, target=t)[0]
-                        if length is not None:
-                            dist_dict[t] = length
-                    except Exception:
-                        continue
+                return np.float64(0)
 
-            len_first_voxel_in_direction = voxel_dimension[direction]  # add length of first voxel
-            path_length_list = [dist_dict[target] + len_first_voxel_in_direction for target in target_nodes if target in dist_dict]
+            # dist_matrix shape (n_sources, n_nodes)
+            # For each target, find the minimal distance from any source
+            path_length_list = []
+            len_first_voxel_in_direction = voxel_dimension[direction]
+            for t_idx in target_compact:
+                # extract column for target across sources
+                if dist_matrix.ndim == 1:
+                    dists = np.array([dist_matrix[t_idx]])
+                else:
+                    dists = dist_matrix[:, t_idx]
+                finite = dists[np.isfinite(dists)]
+                if finite.size > 0:
+                    path_length_list.append(float(np.min(finite)) + len_first_voxel_in_direction)
 
             if not path_length_list:
-                #print(f'No valid paths were found for the specified microstructure for phase {phase_of_interest} in direction {direction}.')
                 return np.float64(0)
 
             mean_path_length = np.mean(path_length_list)
-            length_of_ms_in_specified_direction = ms_phase_of_interest.shape[direction]*voxel_dimension[direction]
-
-            return mean_path_length/length_of_ms_in_specified_direction
+            length_of_ms_in_specified_direction = shape[direction] * voxel_dimension[direction]
+            return mean_path_length / length_of_ms_in_specified_direction
         
         def SSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             '''
@@ -272,12 +286,12 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
-    # ms = np.zeros((3, 3, 3))
-    # ms[1,:,:] = 1
+    ms = np.zeros((3, 3, 3))
+    #ms[1,:,:] = 1
     # ms[2,:,:] = 2
-#     # print(f'ms: {ms}')
-#     # print(f'shape: {(ms.shape)}')
-#     # print(f'ms type: {type(ms)}, size: {ms.size}')
+    print(f'ms: {ms}')
+    print(f'shape: {(ms.shape)}')
+    print(f'ms type: {type(ms)}, size: {ms.size}')
 
 #     ms = np.zeros((3, 3))
 #     ms[1,:] = 1
@@ -285,8 +299,8 @@ if __name__=="__main__":
 #     print(f'shape: {(ms.shape)}')
 #     print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    np.random.seed(10)
-    ms = np.random.randint(2, size=(30,30,30))
+    # np.random.seed(10)
+    # ms = np.random.randint(2, size=(70,70,70))
     #print(f'ms: {ms}, size: {ms.size}')
 
 
