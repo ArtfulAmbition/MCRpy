@@ -29,6 +29,8 @@ def get_connected_phases_of_interest(labeled_ms: np.ndarray[int], direction:int=
             
             dimensionality = len(labeled_ms.shape)
             assert dimensionality in [2,3] # only 2 and 3D microstructures
+            assert direction in [0,1,2]
+
 
             # Generate the appropriate slices based on dimensionality and direction
             slices_source = [slice(None)] * dimensionality  # Initialize a list of slices
@@ -87,7 +89,6 @@ class Percolation(PhaseDescriptor):
             assert dimensionality in [2,3] # only 2 and 3D microstructures
 
             labeled_ms, n_labels = get_labeled_ms(ms_phase_of_interest,connectivity=connectivity)
-
             # labeled_ms is an np.ndarray of the size of ms. 
             # It contains equal integer values for connected voxels of interest (cluster).
             # The function checks, if there is a connection between the sides of the ms in the prescribed direction.
@@ -153,8 +154,6 @@ class Percolation(PhaseDescriptor):
 
             return fraction_connected_voxels, is_percolating, percolation_info_dict
             
-
-        #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             # ms_phase_of_interest is an np.ndarray with bool values representing the 
             # microstructure ms where the searched for phase is represented as True, else False.
@@ -224,7 +223,7 @@ if __name__=="__main__":
     ms = np.load(minimal_example_ms)
 
 
-    ms = np.zeros((3, 3, 3))
+    ms = np.zeros((200, 200, 200))
     ms[1,:, :] = 1
 
     ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
