@@ -30,6 +30,7 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
 import logging
+from mpi4py import MPI
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
@@ -45,6 +46,7 @@ class Tortuosity(PhaseDescriptor):
         direction : int = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
+        use_mpi:bool = True,
         **kwargs) -> callable:
 
         assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
@@ -145,10 +147,27 @@ class Tortuosity(PhaseDescriptor):
             source_compact = [mapping[int(f)] for f in node_flat[source_mask_coords]]
             target_compact = [mapping[int(f)] for f in node_flat[target_mask_coords]]
 
+            def compute(csgraph,indices):
+                return sp_dijkstra(csgraph=csgraph, directed=False, indices=indices)
+
+            if use_mpi:
+                # MPI initialization
+                comm = MPI.COMM_WORLD
+                rank = comm.Get_rank()
+                size = comm.Get_size()  
+
+                if rank == 0:
+                    start = 0
+                if rank != 0:
+
+            else:
+                source_compact_list = [source_compact]
+
             # run multi-source dijkstra (compute distances from all sources)
             try:
                 logging.debug(f"DSPSM: Running Dijkstra with {len(source_compact)} source(s) and {len(target_compact)} target(s)")
-                dist_matrix = sp_dijkstra(csgraph=A, directed=False, indices=source_compact)
+                for source_compact in source_compact_list:
+                    dist_matrix = sp_dijkstra(csgraph=A, directed=False, indices=source_compact)
                 logging.debug(f"DSPSM: Dijkstra completed")
             except Exception as e:
                 logging.error(f"DSPSM: Dijkstra computation failed: {e}")
