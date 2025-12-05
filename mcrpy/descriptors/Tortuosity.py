@@ -29,6 +29,7 @@ from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
+import logging
 
 class Tortuosity(PhaseDescriptor):
     is_differentiable = False
@@ -57,9 +58,10 @@ class Tortuosity(PhaseDescriptor):
         #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
-
+            logging.info('Entering DSPSM function.')
             # Quick exit if ms_phase_of_interest contains only False
             if not ms_phase_of_interest.any():
+                logging.debug("DSPSM: No phase voxels found, returning 0")
                 return np.float64(0)
 
             # Build sparse adjacency between voxels of the phase using vectorized shifts
@@ -128,10 +130,11 @@ class Tortuosity(PhaseDescriptor):
             rows_m = [mapping[int(r)] for r in rows]
             cols_m = [mapping[int(c)] for c in cols]
 
-
+            logging.info('Finished creating inputs for sparse adjacency matrix.')
             # sparse matrix with data_val, rows, cols and shape args
             A = coo_matrix((np.array(data, dtype=np.float64), (np.array(rows_m), np.array(cols_m))), shape=(len(node_flat), len(node_flat))).tocsr()
-
+            logging.info('Finished creating sparse adjacency matrix.')
+            
             # identify source and target compact indices
             idx_max_position_in_direction = shape[direction] - 1
             source_mask_coords = node_coords[:, direction] == 0
@@ -144,9 +147,14 @@ class Tortuosity(PhaseDescriptor):
 
             # run multi-source dijkstra (compute distances from all sources)
             try:
+                logging.debug(f"DSPSM: Running Dijkstra with {len(source_compact)} source(s) and {len(target_compact)} target(s)")
                 dist_matrix = sp_dijkstra(csgraph=A, directed=False, indices=source_compact)
-            except Exception:
+                logging.debug(f"DSPSM: Dijkstra completed")
+            except Exception as e:
+                logging.error(f"DSPSM: Dijkstra computation failed: {e}")
                 return np.float64(0)
+            logging.info('Finished multi-source dijkstra computation.')
+
 
             # dist_matrix shape (n_sources, n_nodes)
             # For each target, find the minimal distance from any source
@@ -163,11 +171,14 @@ class Tortuosity(PhaseDescriptor):
                     path_length_list.append(float(np.min(finite)) + len_first_voxel_in_direction)
 
             if not path_length_list:
+                logging.warning("DSPSM: No path lengths computed")
                 return np.float64(0)
 
             mean_path_length = np.mean(path_length_list)
             length_of_ms_in_specified_direction = shape[direction] * voxel_dimension[direction]
-            return mean_path_length / length_of_ms_in_specified_direction
+            tortuosity = mean_path_length / length_of_ms_in_specified_direction
+            logging.info(f"DSPSM: Tortuosity = {tortuosity:.4f} (mean path length: {mean_path_length:.2f})")
+            return tortuosity
         
         def SSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             '''
@@ -229,6 +240,22 @@ def register() -> None:
        
 
 if __name__=="__main__":
+
+    # Configure logging for standalone execution
+    import os
+    log_dir = './tortuosity_logs'
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'tortuosity.log')
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.DEBUG,
+        format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        force=True  # Override any previous basicConfig
+    )
+    logging.info("="*60)
+    logging.info("TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION")
+    logging.info("="*60)
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
@@ -298,8 +325,11 @@ if __name__=="__main__":
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
+    logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
     mean_tort = singlephase_descriptor(ms)
     print('\n -----------------------------')
     print(f'Mean tortuosity value: {mean_tort}')
+    logging.info(f"Standalone execution completed successfully. Result for Mean Tortuosity: {mean_tort}")
+    logging.info("="*60)
 
 ##------------------------------------------------------------------
