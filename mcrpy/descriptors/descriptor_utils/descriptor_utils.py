@@ -28,7 +28,8 @@ def get_connectivity_directions(dimensionality: int, connectivity: Union[str,int
                             (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                             (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0)],dtype=int)
             elif connectivity in ['corners', 26] and dimensionality == 3:
-                full_connectivity_directions = np.array([(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
+                full_connectivity_directions = np.array([
+                     (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
                       (1, 0, 1), (-1, 0, 1), (0, 1, 1), (0, -1, 1),
                       (1, 0, -1), (-1, 0, -1), (0, 1, -1), (0, -1, -1),
                       (1, 1, 0), (1, -1, 0), (-1, 1, 0), (-1, -1, 0),
