@@ -43,7 +43,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [1], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -65,6 +65,7 @@ class Tortuosity(PhaseDescriptor):
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             logging.info('Entering DSPSM function.')
+            
             # Quick exit if ms_phase_of_interest contains only False
             if not ms_phase_of_interest.any():
                 logging.debug("DSPSM: No phase voxels found, returning 0")
@@ -73,25 +74,35 @@ class Tortuosity(PhaseDescriptor):
             # Build sparse adjacency between voxels of the phase using vectorized shifts
             shape = ms_phase_of_interest.shape
             ndim = len(shape)
-            # determine connectivity offsets for this dimensionality
-            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity, mode='full')
-            idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) #each position gets an scalar idx
 
-            # list of flat indices of nodes present
+            # determine connectivity (in which direction are voxels considered as connected?)
+            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity, mode='full')
+            
+            #each position gets an scalar idx (=flat indices)
+            idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) 
+
+            # coordinates where ms_phase_of_interest is True
             node_coords = np.argwhere(ms_phase_of_interest)
+            
+            # Quick exit if no nodes are present
             if node_coords.size == 0:
-                return np.float64(0) # Quick exit if no nodes are present
-            node_flat = np.ravel_multi_index(node_coords.T, shape) #putting all coordinates into an array.
-            # mapping flat index -> compact index
+                return np.float64(0) 
+            
+            # transforming node_coords into an 1D array using flat indices
+            node_flat = np.ravel_multi_index(node_coords.T, shape) 
+            
+            # mapping flat index -> compact index 
+            # The compact index is basically the graph nodal number, so from 0 to n-1 nodes
             mapping = {int(flat): i for i, flat in enumerate(node_flat)}
 
+            # Initializing the lists needed to create the sparse matrix
             rows = []
             cols = []
             data = []
 
-            # iterate connectivity offsets
+            # iterate over all connectivity offsets
             for off in connectivity_directions:
-                off = tuple(int(x) for x in off)
+                off = tuple(int(x) for x in off) #making sure that all direction (= offset) tuples are of type int
                 # compute slices for source and target to avoid wrap-around
                 src_slices = []
                 tgt_slices = []
@@ -108,17 +119,28 @@ class Tortuosity(PhaseDescriptor):
                 src_slices = tuple(src_slices)
                 tgt_slices = tuple(tgt_slices)
 
+                # creating a boolean mask for all start nodes (src) and end nodes (tgt) 
+                # for the respective offset direction
+                # only if src and tgt are True at the same position in their own respective mask, 
+                # a connection is valid (-> valid mask)
                 src_mask = ms_phase_of_interest[src_slices]
                 tgt_mask = ms_phase_of_interest[tgt_slices]
                 valid_mask = src_mask & tgt_mask
                 if not np.any(valid_mask):
                     continue
 
+                # finding the flat indices for src and tgt is now simple by applying the respective masks:
+                # from all flat indices, take the src nodes for the respective offset direction. From these only
+                # take the flat node numbers which have a valid connection in this direction. 
+                # Analogous for tgt. 
                 src_idx = idx_grid[src_slices][valid_mask]
                 tgt_idx = idx_grid[tgt_slices][valid_mask]
 
+                # calculate the weight for the graph nodes.
+                # Here, the weigth is the distance between voxels in the current offset direction
                 weight = float(np.linalg.norm(np.array(off) * np.array(voxel_dimension[:ndim])))
 
+                # put all found flat node indices and weights into the respective lists.
                 rows.extend(src_idx.tolist())
                 cols.extend(tgt_idx.tolist())
                 data.extend([weight] * len(src_idx))
@@ -133,6 +155,10 @@ class Tortuosity(PhaseDescriptor):
                 return np.float64(0)
 
             # map flat rows/cols to compact indices
+            # This is to reduce the size of the resulting matrix. 
+            # This is a NxN matrix where N is not the number of True voxels.
+            # Without the mapping, the size would be MxM with M beeing the total number of 
+            # all voxels, which might be much larger than N.
             rows_m = [mapping[int(r)] for r in rows]
             cols_m = [mapping[int(c)] for c in cols]
 
@@ -152,6 +178,7 @@ class Tortuosity(PhaseDescriptor):
             target_compact = [mapping[int(f)] for f in node_flat[target_mask_coords]]
 
             # run multi-source dijkstra (compute distances from all sources)
+            # [[dist_from_src_node1_to_node1, dist_from_src_node1_to_node2, dist_from_src_node1_to_node3, ...]]
             try:
                 logging.debug(f"DSPSM: Running Dijkstra with {len(source_compact)} source(s) and {len(target_compact)} target(s)")
                 dist_matrix = sp_dijkstra(csgraph=A, directed=False, indices=source_compact)
@@ -167,13 +194,13 @@ class Tortuosity(PhaseDescriptor):
             path_length_list = []
             for t_idx in target_compact:
                 # extract column for target across sources
-                if dist_matrix.ndim == 1:
+                if dist_matrix.ndim == 1: # (if there is only one source node)
                     dists = np.array([dist_matrix[t_idx]])
-                else:
-                    dists = dist_matrix[:, t_idx]
+                else: # (if there are more than one source node)
+                    dists = dist_matrix[:, t_idx] # get all distances from all source nodes to all targets
                 finite = dists[np.isfinite(dists)]
                 if finite.size > 0:
-                    path_length_list.append(float(np.min(finite)))
+                    path_length_list.append(float(np.min(finite))) #only add the shortest paths from source to target
 
             if not path_length_list:
                 logging.warning("DSPSM: No path lengths computed")
@@ -288,10 +315,8 @@ if __name__=="__main__":
     ms = np.load(minimal_example_ms)
 
     ms = ms[:,:,-2:-1]
-    if len(ms.shape)==2 or (len(ms.shape)==3 and ms.shape[-1] == 1):
-        import matplotlib.pyplot as plt
-        plt.matshow(ms)
-        plt.show()
+
+
     #print(ms)
 
     # print(f'ms: {ms}')
@@ -315,10 +340,18 @@ if __name__=="__main__":
     # ms[3,2,0] = 1
     # ms = ms.astype(int)
 
-    # ms = np.zeros((6, 6))
-    # ms[1,:] = 1
-    # ms[1,5] = 0
-    # ms[2,:,:] = 2
+    # ms = np.zeros((3, 3))
+    # ms[0,0] = 1
+    # ms[0,1] = 1
+    # ms[1,1] = 1
+    # ms[1,2] = 1
+
+    ms = np.zeros((3, 3))
+    ms[0,1] = 1
+    ms[1,1] = 1
+    ms[2,1] = 1
+    ms[2,2] = 1
+
     print(f'ms:\n {ms}')
     print(f'shape: {(ms.shape)}')
     print(f'ms type: {type(ms)}, size: {ms.size}')
@@ -330,7 +363,7 @@ if __name__=="__main__":
 #     print(f'ms type: {type(ms)}, size: {ms.size}')
 
     # np.random.seed(10)
-    # ms = np.random.randint(2, size=(70,70,70))
+    # ms = np.random.randin=(70,70,70))
     #print(f'ms: {ms}, size: {ms.size}')
 
 
@@ -344,6 +377,13 @@ if __name__=="__main__":
     #     data = pickle.load(file)
     # print(f"data: {data}")
     #print(f'ms.shape: {ms.shape}')
+
+    plotting=True
+    if plotting:
+        if len(ms.shape)==2 or (len(ms.shape)==3 and ms.shape[-1] == 1):
+            import matplotlib.pyplot as plt
+            plt.matshow(ms)
+            plt.show()
 
 ##------------------------------------------------------------------
    
