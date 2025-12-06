@@ -37,15 +37,21 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'corners', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
+
+        logging.info(f'input: connectivity: {connectivity}')
+        logging.info(f'input: phase_of_interest: {phase_of_interest}')
+        logging.info(f'input: method: {method}')
+        logging.info(f'input: direction: {direction}')
+        logging.info(f'input: voxel_dimension: {voxel_dimension}')
 
         assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
         assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
@@ -68,7 +74,7 @@ class Tortuosity(PhaseDescriptor):
             shape = ms_phase_of_interest.shape
             ndim = len(shape)
             # determine connectivity offsets for this dimensionality
-            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity)
+            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity, mode='full')
             idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) #each position gets an scalar idx
 
             # list of flat indices of nodes present
@@ -119,9 +125,9 @@ class Tortuosity(PhaseDescriptor):
 
                 # also add reverse direction for undirected graph 
                 # (this should only be used if only one-way connections between voxels are considered)
-                rows.extend(tgt_idx.tolist())
-                cols.extend(src_idx.tolist())
-                data.extend([weight] * len(src_idx))
+                # rows.extend(tgt_idx.tolist())
+                # cols.extend(src_idx.tolist())
+                # data.extend([weight] * len(src_idx))
 
             if len(rows) == 0:
                 return np.float64(0)
@@ -159,7 +165,6 @@ class Tortuosity(PhaseDescriptor):
             # dist_matrix shape (n_sources, n_nodes)
             # For each target, find the minimal distance from any source
             path_length_list = []
-            len_first_voxel_in_direction = voxel_dimension[direction]
             for t_idx in target_compact:
                 # extract column for target across sources
                 if dist_matrix.ndim == 1:
@@ -168,14 +173,14 @@ class Tortuosity(PhaseDescriptor):
                     dists = dist_matrix[:, t_idx]
                 finite = dists[np.isfinite(dists)]
                 if finite.size > 0:
-                    path_length_list.append(float(np.min(finite)) + len_first_voxel_in_direction)
+                    path_length_list.append(float(np.min(finite)))
 
             if not path_length_list:
                 logging.warning("DSPSM: No path lengths computed")
                 return np.float64(0)
 
             mean_path_length = np.mean(path_length_list)
-            length_of_ms_in_specified_direction = shape[direction] * voxel_dimension[direction]
+            length_of_ms_in_specified_direction = (shape[direction]-1) * voxel_dimension[direction]
             tortuosity = mean_path_length / length_of_ms_in_specified_direction
             logging.info(f"DSPSM: Tortuosity = {tortuosity:.4f} (mean path length: {mean_path_length:.2f})")
             return tortuosity
@@ -193,8 +198,6 @@ class Tortuosity(PhaseDescriptor):
 
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            
-            
             
             if (len(ms.shape) > 3): # if called from mcrpy (would be a 4D tensor). If an microstructure is already 2 or 3D, don't change it.
                 if ms.shape[0]==1: #if the microstructure is 2D
@@ -260,7 +263,7 @@ if __name__=="__main__":
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+    #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
 
     #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
 
@@ -279,10 +282,18 @@ if __name__=="__main__":
     #         print('\n\n')
 
 
-    #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
+    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
     ms = np.load(minimal_example_ms)
+
+    ms = ms[:,:,-2:-1]
+    if len(ms.shape)==2 or (len(ms.shape)==3 and ms.shape[-1] == 1):
+        import matplotlib.pyplot as plt
+        plt.matshow(ms)
+        plt.show()
+    #print(ms)
+
     # print(f'ms: {ms}')
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
@@ -290,11 +301,25 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
+    # ms = np.ones((3,3,3))
+    # ms[0,0,0] = 0
+    # ms[1,1,1] = 0
+    # ms[2,2,2] = 0
+    # ms = ms.astype(int)
+
+    # ms = np.zeros((5,5,1))
+    # ms[1,2,0] = 1
+    # ms[2,1,0] = 1
+    # ms[2,2,0] = 1
+    # ms[2,3,0] = 1
+    # ms[3,2,0] = 1
+    # ms = ms.astype(int)
+
     # ms = np.zeros((6, 6))
     # ms[1,:] = 1
     # ms[1,5] = 0
     # ms[2,:,:] = 2
-    print(f'ms: {ms}')
+    print(f'ms:\n {ms}')
     print(f'shape: {(ms.shape)}')
     print(f'ms type: {type(ms)}, size: {ms.size}')
 
@@ -304,8 +329,8 @@ if __name__=="__main__":
 #     print(f'shape: {(ms.shape)}')
 #     print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    np.random.seed(10)
-    ms = np.random.randint(2, size=(70,70,70))
+    # np.random.seed(10)
+    # ms = np.random.randint(2, size=(70,70,70))
     #print(f'ms: {ms}, size: {ms.size}')
 
 
@@ -318,7 +343,7 @@ if __name__=="__main__":
     #     # Step 3: Load the data
     #     data = pickle.load(file)
     # print(f"data: {data}")
-    print(f'ms.shape: {ms.shape}')
+    #print(f'ms.shape: {ms.shape}')
 
 ##------------------------------------------------------------------
    
