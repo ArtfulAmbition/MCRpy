@@ -37,13 +37,13 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 'corners', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = [1], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -76,7 +76,7 @@ class Tortuosity(PhaseDescriptor):
             ndim = len(shape)
 
             # determine connectivity (in which direction are voxels considered as connected?)
-            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity, mode='full')
+            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity)
             
             #each position gets an scalar idx (=flat indices)
             idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) 
@@ -346,11 +346,11 @@ if __name__=="__main__":
     # ms[1,1] = 1
     # ms[1,2] = 1
 
-    ms = np.zeros((3, 3))
-    ms[0,1] = 1
-    ms[1,1] = 1
-    ms[2,1] = 1
-    ms[2,2] = 1
+    # ms = np.zeros((3, 3))
+    # ms[0,1] = 1
+    # ms[1,1] = 1
+    # ms[2,1] = 1
+    # ms[2,2] = 1
 
     print(f'ms:\n {ms}')
     print(f'shape: {(ms.shape)}')

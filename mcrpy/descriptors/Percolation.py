@@ -57,7 +57,7 @@ def get_labeled_ms(ms_phase_of_interest: NDArray[np.bool_], connectivity='sides'
             dimensionality = len(ms_phase_of_interest.shape)
             assert dimensionality in [2,3] 
 
-            connectivity_directions = get_connectivity_directions(dimensionality=dimensionality, connectivity=connectivity, mode="full")
+            connectivity_directions = get_connectivity_directions(dimensionality=dimensionality, connectivity=connectivity)
             # convert connectivity_directions to a connectivity_structure as required in label function
             connectivity_structure = np.zeros((3,) * dimensionality, dtype=int)
             connectivity_structure[(1,)*dimensionality] = 1 #center point is always 1 in 2D and 3D

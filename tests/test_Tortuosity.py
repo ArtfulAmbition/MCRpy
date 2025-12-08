@@ -100,6 +100,12 @@ class TestTortuosity(unittest.TestCase):
         ms[2,2, 2] = 0
         self.microstructures['Corners_X_3D'] = ms
     
+        ms_len:int = 20
+        ms = np.ones((ms_len,ms_len,ms_len))
+        ms[:,round(ms_len/4):round(3/4*ms_len),round(ms_len/4):round(3/4*ms_len)] = 0
+
+
+
     def test_tortuosity_vals(self):
         self.setUp()
         args = {
