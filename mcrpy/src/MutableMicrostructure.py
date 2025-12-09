@@ -30,7 +30,7 @@ class MutableMicrostructure(Microstructure):
             skip_encoding = skip_encoding,
             trainable = trainable)
 
-        self.linear_indices = np.array(list(range(np.product(self.spatial_shape))))
+        self.linear_indices = np.array(list(range(np.prod(self.spatial_shape))))
         if self.is_3D:
             self.conv_weights = np.array([[[0, 0,  0], [0, -1, 0], [0, 0, 0]], [[0, -1, 0], [-1, 6, -1], [0, -1, 0]], [[0, 0, 0], [0, -1, 0], [0, 0, 0]]], dtype=np.int32)
             self.neighbor_conv_weights = np.array([[[0, 0,  0], [0, 1, 0], [0, 0, 0]], [[0, 1, 0], [1, 0, 1], [0, 1, 0]], [[0, 0, 0], [0, 1, 0], [0, 0, 0]]], dtype=np.int32)

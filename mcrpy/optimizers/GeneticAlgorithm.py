@@ -55,15 +55,19 @@ class MicrostructureReconstructionProblem(Problem):
         self.is_3D = is_3D
         self.eval_count = 0
         
+        n_var = int(np.prod(ms_shape))
+        
         # Problem definition: Binary variables [0, 1]
         super().__init__(
-            n_var=int(np.prod(ms_shape)),
+            n_var=n_var,
             n_obj=1,
             n_constr=0,
-            type_var=float,
-            lb=0.0,
-            ub=1.0
+            type_var=float
         )
+        
+        # Set bounds explicitly as arrays for pymoo
+        self.xl = np.zeros(n_var)
+        self.xu = np.ones(n_var)
     
     def _evaluate(self, x, out, *args, **kwargs):
         """Evaluate population."""
@@ -138,8 +142,8 @@ class GeneticAlgorithm(Optimizer):
             conv_iter: Convergence iterations (stopping criterion)
             callback: Callback function after each iteration
             population_size: Size of population (default: 50)
-            mutation_rate: Mutation probability (0-1, default: 0.1)
-            crossover_rate: Crossover probability (0-1, default: 0.9)
+            mutation_rate: Mutation probability (valid between 0 and 1, default: 0.1)
+            crossover_rate: Crossover probability (valid between 0 and 1, default: 0.9)
             mutation_eta: Distribution index for mutation (higher = more local, default: 20)
             crossover_eta: Distribution index for crossover (higher = more local, default: 15)
             seed: Random seed for reproducibility
@@ -246,8 +250,10 @@ class GeneticAlgorithm(Optimizer):
         
         self.current_loss = best_loss
         
-        # Update microstructure
-        ms.xx = best_individual
+        # Convert back to TensorFlow variable format and update
+        # Reshape to match the internal x_shape
+        best_individual_reshaped = best_individual.astype(np.float64).reshape(ms.x.shape)
+        ms.x.assign(tf.constant(best_individual_reshaped, dtype=tf.float64))
         
         logging.info(f"GA optimization completed after {problem.eval_count} evaluations")
         logging.info(f"Final loss: {best_loss:.6f}")
@@ -308,6 +314,7 @@ def register() -> None:
 # Example usage
 if __name__ == "__main__":
     import numpy as np
+    from mcrpy.src.MutableMicrostructure import MutableMicrostructure
     
     logging.basicConfig(level=logging.INFO)
     
@@ -318,17 +325,31 @@ if __name__ == "__main__":
     
     # Create test microstructure
     ms_shape = (20, 20)
-    ms = np.random.randint(2, size=ms_shape).astype(float)
+    initial_ms = np.random.randint(2, size=ms_shape).astype(bool)
     
-    # Create GA optimizer
+    print(f"Initial microstructure sum: {np.sum(initial_ms)}")
+    print(f"Starting GA optimization...")
+    
+    # Create MutableMicrostructure wrapper
+    mm = MutableMicrostructure(initial_ms)
+    
+    # Create and run GA optimizer
     ga = GeneticAlgorithm(
-        max_iter=50,
-        population_size=30,
+        max_iter=30,
+        population_size=20,
         loss=simple_loss,
         is_3D=False
     )
     
-    ga.set_call_loss(lambda _: simple_loss)
+    # Run optimization
+    result = ga.optimize(mm)
     
-    print(f"Initial microstructure sum: {np.sum(ms)}")
-    print(f"GA optimization would minimize this value...")
+    # Get optimized microstructure
+    optimized_ms = mm.xx
+    
+    print(f"\nOptimization Results:")
+    print(f"  Initial sum: {np.sum(initial_ms)}")
+    print(f"  Optimized sum: {np.sum(optimized_ms)}")
+    print(f"  Final loss: {ga.current_loss:.6f}")
+    print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
+    print(f"\n✓ Fittest microstructure found!")
