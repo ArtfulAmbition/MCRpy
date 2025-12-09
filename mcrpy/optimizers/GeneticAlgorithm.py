@@ -133,6 +133,7 @@ class GeneticAlgorithm(Optimizer):
             use_multiphase: bool = False,
             use_orientations: bool = False,
             is_3D: bool = False,
+            target_loss:float=0,
             **kwargs):
         """
         Initialize Genetic Algorithm Optimizer.
@@ -164,6 +165,7 @@ class GeneticAlgorithm(Optimizer):
         self.is_3D = is_3D
         self.conv_iter = conv_iter
         self.reconstruction_callback = callback
+        self.target_loss = target_loss
         
         # GA-specific parameters
         self.population_size = population_size
@@ -280,6 +282,12 @@ class GeneticAlgorithm(Optimizer):
         best_fitness = float(algorithm.pop.get("F").min())
         self.fitness_history.append(best_fitness)
         
+        # Stop if target loss is achieved
+        if best_fitness <= self.target_loss:
+            logging.info(f"Target loss of {self.target_loss} achieved.")
+            algorithm.termination.force_termination = True
+            return  # Exit the callback
+
         # Update current loss
         if best_fitness < self.current_loss:
             self.current_loss = best_fitness
@@ -323,11 +331,26 @@ if __name__ == "__main__":
         """Minimize number of 1s."""
         return float(np.sum(ms))
     
+    import os
+    from mcrpy.descriptors.Tortuosity import Tortuosity
+
+    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+
+    ms = np.load(minimal_example_ms)
+    ms = ms[:,:,-2:-1]
+    singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
+    mean_tort = singlephase_descriptor(ms)
+    print(f'goal tort: {mean_tort}')
+
+    def simple_loss(current_ms):
+        return np.linalg.norm(singlephase_descriptor(current_ms) - mean_tort)
+    
+    
     # Create test microstructure
-    ms_shape = (20, 20)
+    ms_shape = ms.shape
     initial_ms = np.random.randint(2, size=ms_shape).astype(bool)
     
-    print(f"Initial microstructure sum: {np.sum(initial_ms)}")
     print(f"Starting GA optimization...")
     
     # Create MutableMicrostructure wrapper
@@ -335,21 +358,20 @@ if __name__ == "__main__":
     
     # Create and run GA optimizer
     ga = GeneticAlgorithm(
-        max_iter=30,
-        population_size=20,
+        max_iter=200,
+        population_size=200,
         loss=simple_loss,
         is_3D=False
     )
     
     # Run optimization
     result = ga.optimize(mm)
-    
+    print(f'result: {result}')
     # Get optimized microstructure
     optimized_ms = mm.xx
-    
+    #print(f'optimized_ms: {optimized_ms.numpy().reshape((20,20))}')
     print(f"\nOptimization Results:")
-    print(f"  Initial sum: {np.sum(initial_ms)}")
-    print(f"  Optimized sum: {np.sum(optimized_ms)}")
+    print(f"  Initial loss: {simple_loss(initial_ms)}")
+    print(f"  Optimized los: {simple_loss(optimized_ms)}")
     print(f"  Final loss: {ga.current_loss:.6f}")
     print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
-    print(f"\n✓ Fittest microstructure found!")
