@@ -74,8 +74,8 @@ class MicrostructureReconstructionProblem(Problem):
         f = []
         
         for individual in x:
-            # Konvertiere zu Binary (0/1)
-            binary_individual = np.round(individual).astype(bool)
+            # Convert to binary (0/1) as float64 to match Microstructure representation
+            binary_individual = np.round(individual).astype(np.float64)
             binary_individual_reshaped = binary_individual.reshape(self.ms_shape)
             
             # Prüfe Volume Fractions
@@ -89,7 +89,7 @@ class MicrostructureReconstructionProblem(Problem):
             # Berechne Loss
             try:
                 loss = float(self.loss_function(binary_individual_reshaped))
-            except:
+            except Exception:
                 loss = np.inf
             
             # Gesamtfitness = Loss + Penalty
@@ -268,9 +268,40 @@ class GeneticAlgorithm(Optimizer):
             # Ensure it's a TensorFlow tensor
             if not isinstance(ms_array, tf.Tensor):
                 ms_array = tf.constant(ms_array, dtype=tf.float32)
+
+            # Suppress verbose logging from descriptor/DSPSM during GA evaluations
+            # (otherwise logging fills terminal with repeated entries for each candidate)
+            old_level = logging.root.level
+            logging.root.setLevel(logging.WARNING)
             
-            loss = float(self.loss(ms_array))
-            return loss
+            try:
+                # Prefer using the pre-built `call_loss` (from loss_computation.make_call_loss)
+                # which expects a `Microstructure` object. If it's available, wrap the
+                # candidate array into a `MutableMicrostructure` and call it.
+                if hasattr(self, 'call_loss') and callable(getattr(self, 'call_loss')):
+                    try:
+                        # Convert tensor to numpy array
+                        arr = ms_array.numpy().astype(np.float64)
+
+                        # If array has extra singleton dimensions (e.g., (1,20,20,1,1)),
+                        # squeeze them until we have 2D or 3D, which MutableMicrostructure expects.
+                        squeezed = np.squeeze(arr)
+                        if squeezed.ndim not in {2, 3}:
+                            squeezed = squeezed.reshape(-1) if squeezed.size > 0 else squeezed
+                        arr_use = squeezed
+
+                        temp_ms = MutableMicrostructure(arr_use)
+                        val = self.call_loss(temp_ms)
+                        return float(val)
+                    except Exception as e:
+                        logging.debug(f"[GA debug] call_loss wrapper failed: {e}")
+                        pass
+
+                loss = float(self.loss(ms_array))
+                return loss
+            finally:
+                # Restore logging level
+                logging.root.setLevel(old_level)
         except Exception as e:
             logging.warning(f"Loss evaluation failed: {e}")
             return np.inf
@@ -282,12 +313,6 @@ class GeneticAlgorithm(Optimizer):
         best_fitness = float(algorithm.pop.get("F").min())
         self.fitness_history.append(best_fitness)
         
-        # Stop if target loss is achieved
-        if best_fitness <= self.target_loss:
-            logging.info(f"Target loss of {self.target_loss} achieved.")
-            algorithm.termination.force_termination = True
-            return  # Exit the callback
-
         # Update current loss
         if best_fitness < self.current_loss:
             self.current_loss = best_fitness
@@ -302,6 +327,12 @@ class GeneticAlgorithm(Optimizer):
                 self.reconstruction_callback(algorithm.n_gen)
             except Exception as e:
                 logging.warning(f"Callback failed: {e}")
+        
+        # Stop if target loss is achieved (only if target_loss > 0, else skip)
+        if self.target_loss > 0 and best_fitness <= self.target_loss:
+            logging.info(f"Target loss of {self.target_loss} achieved.")
+            algorithm.termination.force_termination = True
+            return
         
         # Early stopping if no improvement
         if self.no_improve_count >= self.conv_iter:
@@ -337,31 +368,39 @@ if __name__ == "__main__":
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
 
-    ms = np.load(minimal_example_ms)
-    ms = ms[:,:,-2:-1]
+    # ms = np.load(minimal_example_ms)
+    # ms = ms[:,:,-2:-1]
+    ms = np.zeros((5,5))
+    ms[1,2] = 1
+    ms[2,1] = 1
+    ms[2,2] = 1
+    ms[2,3] = 1
+    ms[3,2] = 1
+    ms_shape = ms.shape
+
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
     mean_tort = singlephase_descriptor(ms)
+    #mean_tort = 20.0 #example
     print(f'goal tort: {mean_tort}')
 
     def simple_loss(current_ms):
         return np.linalg.norm(singlephase_descriptor(current_ms) - mean_tort)
     
-    
-    # Create test microstructure
+    # Create test microstructure with matching volume fraction
+    # (ensures non-zero tortuosity descriptor for random candidates)
     ms_shape = ms.shape
-    initial_ms = np.random.randint(2, size=ms_shape).astype(bool)
-    
-    print(f"Starting GA optimization...")
+    initial_ms = np.random.random(ms_shape)
     
     # Create MutableMicrostructure wrapper
     mm = MutableMicrostructure(initial_ms)
     
-    # Create and run GA optimizer
+    # Create and run GA optimizer (target_loss=0 means no early exit on target)
     ga = GeneticAlgorithm(
-        max_iter=200,
+        max_iter=20,
         population_size=200,
         loss=simple_loss,
-        is_3D=False
+        is_3D=False,
+        target_loss=0
     )
     
     # Run optimization
@@ -369,9 +408,12 @@ if __name__ == "__main__":
     print(f'result: {result}')
     # Get optimized microstructure
     optimized_ms = mm.xx
-    #print(f'optimized_ms: {optimized_ms.numpy().reshape((20,20))}')
     print(f"\nOptimization Results:")
     print(f"  Initial loss: {simple_loss(initial_ms)}")
-    print(f"  Optimized los: {simple_loss(optimized_ms)}")
+    print(f"  Optimized loss: {simple_loss(optimized_ms)}")
     print(f"  Final loss: {ga.current_loss:.6f}")
     print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
+    print(f'\noriginal ms:\n {ms.reshape(ms_shape)}\n')
+    print(f'optimized ms:\n {optimized_ms.numpy().reshape(ms_shape)}')
+
+    print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
