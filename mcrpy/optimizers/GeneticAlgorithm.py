@@ -133,7 +133,7 @@ class GeneticAlgorithm(Optimizer):
             use_multiphase: bool = False,
             use_orientations: bool = False,
             is_3D: bool = False,
-            target_loss:float=0,
+            target_loss:float=1e-5,
             **kwargs):
         """
         Initialize Genetic Algorithm Optimizer.
@@ -400,8 +400,7 @@ if __name__ == "__main__":
         max_iter=20,
         population_size=200,
         loss=simple_loss,
-        is_3D=False,
-        target_loss=0
+        is_3D=True
     )
     
     # Run optimization
