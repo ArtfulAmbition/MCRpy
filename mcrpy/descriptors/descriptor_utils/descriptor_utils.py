@@ -1,8 +1,10 @@
 from typing import Union
+import numpy as np
 import itertools
 
 def get_connectivity_directions(dimensionality: int, connectivity: Union[str,int]):
-    ''' returns a list of tuples which represent the directions of connectivity for a voxel at origin (0,0) or (0,0,0).
+    ''' returns a list of tuples [(0,1), (0,-1), (1,0), (-1,0), (1,1) ... ]
+        which represent the directions of connectivity for a voxel at origin (0,0) or (0,0,0).
         The directions of connectivity are governed by connectivity.
         Valid inputs for connectivity are 'sides', 'edges, 'corners' 4, 6, 8, 18 or 26.
     '''
@@ -47,6 +49,33 @@ def get_connectivity_directions(dimensionality: int, connectivity: Union[str,int
         raise Exception(f'Connectivity argument (connectivity={connectivity}) and dimensionality (dimensionality={dimensionality}D) mismatch!  \nValid arguments for 3D are [sides, edges, corners, 6, 18, 28] \nand for 2D [sides, edges, corners, 4, 8].')
 
     return valid_directions
+
+def slice_ndarray(data:np.ndarray, axis:int=0, index:int=0):
+    """
+    Slices an ndarray of any dimensionality based on the specified axis and index.
+
+    Parameters:
+    - data (ndarray): The ndarray to be sliced.
+    - axis (int): The axis to slice (0-based indexing).
+    - index (int): The index at which to slice.
+
+    Returns:
+    - ndarray: The sliced ndarray.
+    """
+    assert (isinstance(data,np.ndarray) and 
+            isinstance(axis,int) and 
+            isinstance(index,int)), "Input type error in slice_ndarray."
+
+    # Check if the axis is valid
+    if axis < 0 or axis >= data.ndim:
+        raise ValueError(f"Axis must be between 0 and {data.ndim - 1}.")
+
+    # Create a slice object
+    slices = [slice(None)] * data.ndim  # Start with full slices for all axes
+    slices[axis] = index  # Set the specified axis to the index
+
+    return data[tuple(slices)]  # Return the sliced ndarray
+
 
 
 if __name__=="__main__":

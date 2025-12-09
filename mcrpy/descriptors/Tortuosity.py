@@ -24,11 +24,11 @@ from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from numpy.typing import NDArray
 from typing import Any, Union
 import numpy as np
-from skimage.morphology import skeletonize
+from skimage.morphology import medial_axis
 from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_labeled_ms
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
-from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
+from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions, slice_ndarray
 import logging
 
 class Tortuosity(PhaseDescriptor):
@@ -41,7 +41,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
@@ -185,6 +185,7 @@ class Tortuosity(PhaseDescriptor):
                 logging.debug(f"DSPSM: Dijkstra completed")
             except Exception as e:
                 logging.error(f"DSPSM: Dijkstra computation failed: {e}")
+                print("DSPSM: Dijkstra computation failed. Returning zero.")
                 return np.float64(0)
             logging.info('Finished multi-source dijkstra computation.')
 
@@ -218,9 +219,39 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
-            print(f'ms_phase_of_interest: {ms_phase_of_interest}')
-            skeleton_ms = skeletonize(ms_phase_of_interest)
-            print(f'skeleton_ms: {skeleton_ms}')
+            plotting=True
+            if plotting:
+                ms_to_plot = ms_phase_of_interest
+                if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
+                    import matplotlib.pyplot as plt
+                    plt.matshow(ms_to_plot)
+                    plt.show()
+
+            total_number_slices = ms_phase_of_interest.shape[direction]
+            skeleton_slice_list = []
+            for slice_number in range(total_number_slices):
+                # Get the slice from the original ndarray
+                ms_slice = slice_ndarray(data=ms_phase_of_interest,axis=direction,index=slice_number)
+
+                # Apply medial_axis to the sliced data
+                skeleton_slice = medial_axis(ms_slice)
+
+                # Append the resulting skeleton slice to the list
+                skeleton_slice_list.append(skeleton_slice)
+
+
+            # Stack the list of skeleton slices back into an ndarray, maintaining the original shape
+            skeleton_ms = np.stack(skeleton_slice_list, axis=direction)
+
+
+            plotting=True
+            if plotting:
+                ms_to_plot = skeleton_ms[:,:,-2]
+                if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
+                    import matplotlib.pyplot as plt
+                    plt.matshow(ms_to_plot)
+                    plt.show()
+
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
         #@tf.function
@@ -314,7 +345,16 @@ if __name__=="__main__":
     
     ms = np.load(minimal_example_ms)
 
-    ms = ms[:,:,-2:-1]
+    #ms = ms[:,:,-2]
+
+    #ms = np.fliplr(ms)
+
+    # ms_len:int = 200
+    # ms = np.ones((ms_len,ms_len,ms_len))
+    # ms[:,round(ms_len/4):round(3/4*ms_len),round(ms_len/4):round(3/4*ms_len)] = 0
+
+    # l = 100
+    # ms = np.zeros((l,l,l))
 
 
     #print(ms)
@@ -352,9 +392,9 @@ if __name__=="__main__":
     # ms[2,1] = 1
     # ms[2,2] = 1
 
-    print(f'ms:\n {ms}')
-    print(f'shape: {(ms.shape)}')
-    print(f'ms type: {type(ms)}, size: {ms.size}')
+    # print(f'ms:\n {ms}')
+    # print(f'shape: {(ms.shape)}')
+    # print(f'ms type: {type(ms)}, size: {ms.size}')
 
 #     ms = np.zeros((3, 3))
 #     ms[1,:] = 1
@@ -378,11 +418,13 @@ if __name__=="__main__":
     # print(f"data: {data}")
     #print(f'ms.shape: {ms.shape}')
 
+    
     plotting=True
     if plotting:
-        if len(ms.shape)==2 or (len(ms.shape)==3 and ms.shape[-1] == 1):
+        ms_to_plot = ms
+        if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
             import matplotlib.pyplot as plt
-            plt.matshow(ms)
+            plt.matshow(ms_to_plot)
             plt.show()
 
 ##------------------------------------------------------------------
