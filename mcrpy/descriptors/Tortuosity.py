@@ -38,7 +38,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 0, #0:x, 1:y, 2:z
         is_direction_reversed:bool = False, # The calculation of the Tortuosity is direction dependent. 
                                             # Set is_direction_reversed to True if the calculation should be from highest values in specofied direction to smallest values.
@@ -243,7 +243,7 @@ class Tortuosity(PhaseDescriptor):
             skeleton_ms = np.stack(skeleton_slice_list, axis=direction)
 
 
-            plotting=True
+            plotting=False
             if plotting:
                 plot_slices(data=ms_phase_of_interest,direction=direction,block=False)
                 plot_slices(data=skeleton_ms,direction=direction)

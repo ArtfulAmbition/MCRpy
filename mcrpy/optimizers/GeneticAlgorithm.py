@@ -376,7 +376,7 @@ if __name__ == "__main__":
     # ms[2,2] = 1
     # ms[2,3] = 1
     # ms[3,2] = 1
-    ms = np.random.randint(0, 2, size=(20,20))
+    ms = np.random.randint(0, 2, size=(20,20,20))
     ms_shape = ms.shape
 
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
@@ -413,7 +413,8 @@ if __name__ == "__main__":
     print(f"  Optimized loss: {simple_loss(optimized_ms)}")
     print(f"  Final loss: {ga.current_loss:.6f}")
     print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
-    print(f'\noriginal ms:\n {ms.reshape(ms_shape)}\n')
-    print(f'optimized ms:\n {optimized_ms.numpy().reshape(ms_shape)}')
+    print(f'\noriginal ms:\n {ms}\n')
+    # print(f'optimized ms:\n {optimized_ms.numpy().reshape(ms_shape)}')
+    print(f'optimized ms:\n {optimized_ms.reshape(ms.shape)}')
 
     print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
