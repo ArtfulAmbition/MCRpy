@@ -41,8 +41,8 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        direction : int = 0, #0:x, 1:y, 2:z
+        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        direction : int = 0, #0:x, 1:y, 2:z.
         phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -146,7 +146,8 @@ class Tortuosity(PhaseDescriptor):
                 data.extend([weight] * len(src_idx))
 
                 # also add reverse direction for undirected graph 
-                # (this should only be used if only one-way connections between voxels are considered)
+                # (this should only be used if only one-way connections between voxels are considered,
+                #  but it seems that performancewise this doesn't make a big difference.)
                 # rows.extend(tgt_idx.tolist())
                 # cols.extend(src_idx.tolist())
                 # data.extend([weight] * len(src_idx))
@@ -309,6 +310,8 @@ if __name__=="__main__":
     logging.info("="*60)
     logging.info("TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION")
     logging.info("="*60)
+    # Suppress Matplotlib logging
+    logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
     import os
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
@@ -332,7 +335,9 @@ if __name__=="__main__":
     #         print('\n\n')
 
 
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    minimal_example_ms = os.path.join(folder,'Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600.npy')
+
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
     ms = np.load(minimal_example_ms)
