@@ -16,9 +16,6 @@
 # from __future__ import annotations
 
 import tensorflow as tf
-import networkx as nx
-from itertools import combinations
-
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from numpy.typing import NDArray
@@ -43,7 +40,7 @@ class Tortuosity(PhaseDescriptor):
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         direction : int = 1, #0:x, 1:y, 2:z
-        is_direction_reversed:bool = True, # The calculation of the Tortuosity is direction dependent. 
+        is_direction_reversed:bool = False, # The calculation of the Tortuosity is direction dependent. 
                                             # Set is_direction_reversed to True if the calculation should be from highest values in specofied direction to smallest values.
         phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
