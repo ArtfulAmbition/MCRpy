@@ -37,12 +37,14 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 'corners', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        direction : int = 0, #0:x, 1:y, 2:z.
+        direction : int = 1, #0:x, 1:y, 2:z
+        is_direction_reversed:bool = True, # The calculation of the Tortuosity is direction dependent. 
+                                            # Set is_direction_reversed to True if the calculation should be from highest values in specofied direction to smallest values.
         phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
@@ -59,7 +61,7 @@ class Tortuosity(PhaseDescriptor):
         assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
         assert isinstance(voxel_dimension,tuple)
         assert all([val>0 for val in voxel_dimension]), "Only positive values for the voxel dimensions are permitted."
-
+        assert isinstance(is_direction_reversed, bool)
         
         #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
@@ -170,8 +172,13 @@ class Tortuosity(PhaseDescriptor):
             
             # identify source and target compact indices
             idx_max_position_in_direction = shape[direction] - 1
-            source_mask_coords = node_coords[:, direction] == 0
-            target_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
+            if is_direction_reversed:
+                source_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
+                target_mask_coords = node_coords[:, direction] == 0
+            else:
+                source_mask_coords = node_coords[:, direction] == 0
+                target_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
+            
             if not np.any(source_mask_coords) or not np.any(target_mask_coords):
                 return np.float64(0)
 
@@ -335,14 +342,14 @@ if __name__=="__main__":
     #         print('\n\n')
 
 
-    # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600.npy')
+    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    #minimal_example_ms = os.path.join(folder,'Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600.npy')
 
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
     ms = np.load(minimal_example_ms)
 
-    #ms = ms[:,:,-2]
+    ms = ms[:,:,-2:-1]
 
     #ms = np.fliplr(ms)
 
