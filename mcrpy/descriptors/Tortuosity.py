@@ -28,7 +28,7 @@ from skimage.morphology import medial_axis
 from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_labeled_ms
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
-from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions, slice_ndarray
+from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions, slice_ndarray, plot_slices
 import logging
 
 class Tortuosity(PhaseDescriptor):
@@ -37,7 +37,7 @@ class Tortuosity(PhaseDescriptor):
 
     @staticmethod
     def make_singlephase_descriptor(
-        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'corners', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
@@ -219,13 +219,7 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
-            plotting=True
-            if plotting:
-                ms_to_plot = ms_phase_of_interest
-                if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
-                    import matplotlib.pyplot as plt
-                    plt.matshow(ms_to_plot)
-                    plt.show()
+
 
             total_number_slices = ms_phase_of_interest.shape[direction]
             skeleton_slice_list = []
@@ -246,11 +240,9 @@ class Tortuosity(PhaseDescriptor):
 
             plotting=True
             if plotting:
-                ms_to_plot = skeleton_ms[:,:,-2]
-                if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
-                    import matplotlib.pyplot as plt
-                    plt.matshow(ms_to_plot)
-                    plt.show()
+                plot_slices(data=ms_phase_of_interest,direction=direction,block=False)
+                plot_slices(data=skeleton_ms,direction=direction)
+
 
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 

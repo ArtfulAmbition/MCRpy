@@ -1,6 +1,7 @@
 from typing import Union
 import numpy as np
 import itertools
+import matplotlib.pyplot as plt
 
 def get_connectivity_directions(dimensionality: int, connectivity: Union[str,int]):
     ''' returns a list of tuples [(0,1), (0,-1), (1,0), (-1,0), (1,1) ... ]
@@ -76,6 +77,49 @@ def slice_ndarray(data:np.ndarray, axis:int=0, index:int=0):
 
     return data[tuple(slices)]  # Return the sliced ndarray
 
+def plot_slices(data: np.ndarray, 
+                direction: int, 
+                rows: int=2, 
+                max_number_slices:int=10, 
+                block:bool=True):
+    """
+    Plots each slice of the given ndarray in subplots using matshow,
+    arranged over a specified number of rows.
+
+    Parameters:
+    - data (ndarray): The input n-dimensional array.
+    - direction (int): The direction to slice the array (0, 1, or 2 for 3D arrays).
+    - rows (int): The number of rows in which to arrange the subplots.
+    """
+    # Check if direction is valid
+    if direction < 0 or direction >= data.ndim:
+        raise ValueError(f"Direction must be between 0 and {data.ndim - 1}.")
+
+    # Number of slices along the specified direction
+    total_slices = data.shape[direction] if data.shape[direction] < max_number_slices else max_number_slices
+    
+    # Calculate number of columns needed
+    cols = (total_slices + rows - 1) // rows  # Ceiling division
+    
+    # Create a figure with subplots
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5, rows * 5))
+    axes = axes.flatten()  # Flatten axes for easier indexing
+    
+    # Plot each slice
+    for slice_number in range(total_slices):
+        # Extract the current slice using the provided slice_ndarray function
+        slice_data = slice_ndarray(data, axis=direction, index=slice_number)
+        
+        # Plot using matshow
+        axes[slice_number].matshow(slice_data)
+        axes[slice_number].set_title(f'Slice {slice_number}')
+        axes[slice_number].axis('off')  # Turn off axis lines and labels
+
+    # Turn off axes for any unused subplots
+    for i in range(total_slices, len(axes)):
+        axes[i].axis('off')
+    plt.tight_layout()
+    plt.show(block=block)
 
 
 if __name__=="__main__":
