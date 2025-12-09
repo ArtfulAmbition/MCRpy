@@ -370,12 +370,13 @@ if __name__ == "__main__":
 
     # ms = np.load(minimal_example_ms)
     # ms = ms[:,:,-2:-1]
-    ms = np.zeros((5,5))
-    ms[1,2] = 1
-    ms[2,1] = 1
-    ms[2,2] = 1
-    ms[2,3] = 1
-    ms[3,2] = 1
+    # ms = np.zeros((5,5))
+    # ms[1,2] = 1
+    # ms[2,1] = 1
+    # ms[2,2] = 1
+    # ms[2,3] = 1
+    # ms[3,2] = 1
+    ms = np.random.randint(0, 2, size=(20,20))
     ms_shape = ms.shape
 
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
