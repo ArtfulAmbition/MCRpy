@@ -43,6 +43,14 @@ except ImportError:
     logging.debug("mpi4py not installed. GA will run serially. Install with: pip install mpi4py")
 
 
+def mpi_logging(message:str, rank:int=0, mode:str='info'):
+    assert isinstance(message,str)
+    if rank==0:
+        if mode.lower() == 'debug':
+            logging.debug(message)
+        elif mode.lower() == 'info':
+            logging.info(message)
+
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
     
@@ -69,7 +77,7 @@ class MicrostructureReconstructionProblem(Problem):
             self.rank = self.comm.Get_rank()
             self.size = self.comm.Get_size()
             if self.rank == 0:
-                logging.info(f"MPI enabled: {self.size} ranks available for parallelization")
+                mpi_logging(f"MPI enabled: {self.size} ranks available for parallelization",rank=self.rank)
         else:
             self.comm = None
             self.rank = 0
@@ -245,10 +253,10 @@ class GeneticAlgorithm(Optimizer):
         self.use_mpi = use_mpi and HAS_MPI
         
         if self.use_mpi:
-            self.mpi_rank = MPI.COMM_WORLD.Get_rank()
+            self.rank = MPI.COMM_WORLD.Get_rank()
             self.mpi_size = MPI.COMM_WORLD.Get_size()
         else:
-            self.mpi_rank = 0
+            self.rank = 0
             self.mpi_size = 1
         
         # GA-specific parameters
@@ -277,14 +285,14 @@ class GeneticAlgorithm(Optimizer):
         msg = f"GeneticAlgorithm initialized with population_size={population_size}, max_iter={max_iter}"
         if self.use_mpi:
             msg += f" (MPI enabled: {self.mpi_size} ranks)"
-        logging.info(msg)
+        mpi_logging(msg,rank=self.rank)
     
     def set_volume_fractions(self, volume_fractions: np.ndarray):
         """Set volume fractions to maintain."""
         self.volume_fractions = volume_fractions
-        logging.info(f"Volume fractions set: {volume_fractions}")
+        mpi_logging(f"Volume fractions set: {volume_fractions}",rank=self.rank)
     
-    def optimize(self, ms, restart_from_niter: int = None):
+    def optimize(self, ms):
         """
         Run genetic algorithm optimization.
         
@@ -293,7 +301,7 @@ class GeneticAlgorithm(Optimizer):
             restart_from_niter: Iteration to restart from (if applicable)
         """
         
-        logging.info(f"Starting GA optimization for microstructure shape {ms.xx.shape}")
+        mpi_logging(f"Starting GA optimization for microstructure shape {ms.xx.shape}",rank=self.rank)
         
         # Get microstructure as binary array
         ms_array = ms.xx.numpy() if isinstance(ms.xx, tf.Tensor) else np.array(ms.xx)
@@ -322,7 +330,7 @@ class GeneticAlgorithm(Optimizer):
         )
         
         # Run optimization
-        logging.info(f"Starting optimization: {self.population_size} individuals, max {self.max_iter} generations")
+        mpi_logging(f"Starting optimization: {self.population_size} individuals, max {self.max_iter} generations",rank=self.rank)
         
         res = minimize(
             problem,
@@ -344,8 +352,8 @@ class GeneticAlgorithm(Optimizer):
         best_individual_reshaped = best_individual.astype(np.float64).reshape(ms.x.shape)
         ms.x.assign(tf.constant(best_individual_reshaped, dtype=tf.float64))
         
-        logging.info(f"GA optimization completed after {problem.eval_count} evaluations")
-        logging.info(f"Final loss: {best_loss:.6f}")
+        mpi_logging(f"GA optimization completed after {problem.eval_count} evaluations",rank=self.rank)
+        mpi_logging(f"Final loss: {best_loss:.6f}",rank=self.rank)
         
         return res
     
@@ -381,7 +389,7 @@ class GeneticAlgorithm(Optimizer):
                         val = self.call_loss(temp_ms)
                         return float(val)
                     except Exception as e:
-                        logging.debug(f"[GA debug] call_loss wrapper failed: {e}")
+                        mpi_logging(f"[GA debug] call_loss wrapper failed: {e}",rank=self.rank)
                         pass
 
                 loss = float(self.loss(ms_array))
@@ -404,7 +412,7 @@ class GeneticAlgorithm(Optimizer):
         if best_fitness < self.current_loss:
             self.current_loss = best_fitness
             self.no_improve_count = 0
-            logging.debug(f"Gen {algorithm.n_gen}: Best fitness improved to {best_fitness:.6f}")
+            mpi_logging(f"Gen {algorithm.n_gen}: Best fitness improved to {best_fitness:.6f}",rank=self.rank)
         else:
             self.no_improve_count += 1
         
@@ -417,19 +425,19 @@ class GeneticAlgorithm(Optimizer):
         
         # Stop if target loss is achieved (only if target_loss > 0, else skip)
         if self.target_loss > 0 and best_fitness <= self.target_loss:
-            logging.info(f"Target loss of {self.target_loss} achieved.")
+            mpi_logging(f"Target loss of {self.target_loss} achieved.",rank=self.rank)
             algorithm.termination.force_termination = True
             return
         
         # Early stopping if no improvement
         if self.no_improve_count >= self.conv_iter:
-            logging.info(f"Early stopping: No improvement for {self.conv_iter} generations")
+            mpi_logging(f"Early stopping: No improvement for {self.conv_iter} generations",rank=self.rank)
             algorithm.termination.force_termination = True
         
         # Log progress
         if algorithm.n_gen % max(1, self.max_iter // 10) == 0:
-            logging.info(f"Generation {algorithm.n_gen}/{self.max_iter}: "
-                         f"Best fitness = {best_fitness:.6f}")
+            mpi_logging(f"Generation {algorithm.n_gen}/{self.max_iter}: "
+                         f"Best fitness = {best_fitness:.6f}",rank=self.rank)
 
 
 def register() -> None:
@@ -445,9 +453,8 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     
     # Test problem: Simple binary optimization
-    def simple_loss(ms):
-        """Minimize number of 1s."""
-        return float(np.sum(ms))
+    def simple_loss(current_ms):
+        return np.linalg.norm(singlephase_descriptor(current_ms) - mean_tort)
     
     import os
     from mcrpy.descriptors.Tortuosity import Tortuosity
@@ -463,13 +470,14 @@ if __name__ == "__main__":
     # ms[2,2] = 1
     # ms[2,3] = 1
     # ms[3,2] = 1
-    ms = np.random.randint(0, 2, size=(20,20,20))
+    ms = np.random.randint(0, 2, size=(7,7))
     ms_shape = ms.shape
 
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
     mean_tort = singlephase_descriptor(ms)
-    #mean_tort = 20.0 #example
-    print(f'goal tort: {mean_tort}')
+    mean_tort = 4.2 #example
+    if MPI.COMM_WORLD.rank == 0:
+        print(f'goal tort: {mean_tort}')
 
     def simple_loss(current_ms):
         return np.linalg.norm(singlephase_descriptor(current_ms) - mean_tort)
@@ -484,8 +492,8 @@ if __name__ == "__main__":
     
     # Create and run GA optimizer (target_loss=0 means no early exit on target)
     ga = GeneticAlgorithm(
-        max_iter=20,
-        population_size=20,
+        max_iter=100,
+        population_size=100,
         loss=simple_loss,
         is_3D=True,
         use_mpi=True
@@ -493,16 +501,18 @@ if __name__ == "__main__":
     
     # Run optimization
     result = ga.optimize(mm)
-    print(f'result: {result}')
-    # Get optimized microstructure
-    optimized_ms = mm.xx
-    print(f"\nOptimization Results:")
-    print(f"  Initial loss: {simple_loss(initial_ms)}")
-    print(f"  Optimized loss: {simple_loss(optimized_ms)}")
-    print(f"  Final loss: {ga.current_loss:.6f}")
-    print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
-    print(f'\noriginal ms:\n {ms}\n')
-    # print(f'optimized ms:\n {optimized_ms.numpy().reshape(ms_shape)}')
-    print(f'optimized ms:\n {optimized_ms.reshape(ms.shape)}')
 
-    print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
+    if MPI.COMM_WORLD.rank == 0:
+        print(f'result: {result}')
+        # Get optimized microstructure
+        optimized_ms = mm.xx
+        print(f"\nOptimization Results:")
+        print(f"  Initial loss: {simple_loss(initial_ms)}")
+        print(f"  Optimized loss: {simple_loss(optimized_ms)}")
+        print(f"  Final loss: {ga.current_loss:.6f}")
+        print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
+        print(f'\noriginal ms:\n {ms}\n')
+        # print(f'optimized ms:\n {optimized_ms.numpy().reshape(ms_shape)}')
+        print(f'optimized ms:\n {optimized_ms.reshape(ms.shape)}')
+
+        print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
