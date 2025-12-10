@@ -35,11 +35,18 @@ except ImportError:
     HAS_PYMOO = False
     logging.warning("pymoo not installed. Install with: pip install pymoo")
 
+try:
+    from mpi4py import MPI
+    HAS_MPI = True
+except ImportError:
+    HAS_MPI = False
+    logging.debug("mpi4py not installed. GA will run serially. Install with: pip install mpi4py")
+
 
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
     
-    def __init__(self, ms_shape, loss_function, volume_fractions=None, is_3D=False):
+    def __init__(self, ms_shape, loss_function, volume_fractions=None, is_3D=False, use_mpi=False):
         """
         Initialize the problem.
         
@@ -48,12 +55,25 @@ class MicrostructureReconstructionProblem(Problem):
             loss_function: Function that computes loss/fitness
             volume_fractions: Optional volume fractions to maintain
             is_3D: Whether problem is 3D
+            use_mpi: Whether to use MPI parallelization
         """
         self.ms_shape = ms_shape
         self.loss_function = loss_function
         self.volume_fractions = volume_fractions
         self.is_3D = is_3D
         self.eval_count = 0
+        self.use_mpi = use_mpi and HAS_MPI
+        
+        if self.use_mpi:
+            self.comm = MPI.COMM_WORLD
+            self.rank = self.comm.Get_rank()
+            self.size = self.comm.Get_size()
+            if self.rank == 0:
+                logging.info(f"MPI enabled: {self.size} ranks available for parallelization")
+        else:
+            self.comm = None
+            self.rank = 0
+            self.size = 1
         
         n_var = int(np.prod(ms_shape))
         
@@ -70,7 +90,14 @@ class MicrostructureReconstructionProblem(Problem):
         self.xu = np.ones(n_var)
     
     def _evaluate(self, x, out, *args, **kwargs):
-        """Evaluate population."""
+        """Evaluate population, optionally parallelized with MPI."""
+        if self.use_mpi:
+            self._evaluate_mpi(x, out)
+        else:
+            self._evaluate_serial(x, out)
+    
+    def _evaluate_serial(self, x, out):
+        """Serial evaluation (single process)."""
         f = []
         
         for individual in x:
@@ -98,6 +125,54 @@ class MicrostructureReconstructionProblem(Problem):
             
             self.eval_count += 1
         
+        out["F"] = np.array(f).reshape(-1, 1)
+    
+    def _evaluate_mpi(self, x, out):
+        """MPI-parallelized evaluation across ranks."""
+        n_individuals = len(x)
+        
+        # Distribute individuals to ranks
+        individuals_per_rank = n_individuals // self.size
+        remainder = n_individuals % self.size
+        
+        # Calculate start and end indices for this rank
+        if self.rank < remainder:
+            start_idx = self.rank * (individuals_per_rank + 1)
+            end_idx = start_idx + individuals_per_rank + 1
+        else:
+            start_idx = remainder * (individuals_per_rank + 1) + (self.rank - remainder) * individuals_per_rank
+            end_idx = start_idx + individuals_per_rank
+        
+        # Evaluate local individuals
+        local_fitnesses = []
+        for i in range(start_idx, end_idx):
+            individual = x[i]
+            binary_individual = np.round(individual).astype(np.float64)
+            binary_individual_reshaped = binary_individual.reshape(self.ms_shape)
+            
+            if self.volume_fractions is not None:
+                current_vf = np.sum(binary_individual_reshaped) / binary_individual_reshaped.size
+                vf_penalty = 10.0 * np.abs(current_vf - self.volume_fractions[1])
+            else:
+                vf_penalty = 0.0
+            
+            try:
+                loss = float(self.loss_function(binary_individual_reshaped))
+            except Exception:
+                loss = np.inf
+            
+            fitness = loss + vf_penalty
+            local_fitnesses.append(fitness)
+        
+        # Gather all fitnesses to rank 0
+        all_fitnesses = self.comm.allgather(local_fitnesses)
+        
+        # Flatten and assign to output
+        f = []
+        for rank_fitnesses in all_fitnesses:
+            f.extend(rank_fitnesses)
+        
+        self.eval_count += n_individuals
         out["F"] = np.array(f).reshape(-1, 1)
 
 
@@ -128,12 +203,12 @@ class GeneticAlgorithm(Optimizer):
             mutation_eta: float = 20.0,
             crossover_eta: float = 15.0,
             seed: int = None,
-            tolerance: float = 1e-5,
             loss: callable = None,
             use_multiphase: bool = False,
             use_orientations: bool = False,
             is_3D: bool = False,
-            target_loss:float=1e-5,
+            target_loss: float = 1e-5,
+            use_mpi: bool = False,
             **kwargs):
         """
         Initialize Genetic Algorithm Optimizer.
@@ -148,11 +223,12 @@ class GeneticAlgorithm(Optimizer):
             mutation_eta: Distribution index for mutation (higher = more local, default: 20)
             crossover_eta: Distribution index for crossover (higher = more local, default: 15)
             seed: Random seed for reproducibility
-            tolerance: Convergence tolerance
             loss: Loss function to minimize
             use_multiphase: Whether to handle multiphase materials
             use_orientations: Whether to handle orientations (not supported)
             is_3D: Whether problem is 3D
+            target_loss: Target loss to stop optimization (default: 1e-5, set to 0 to disable)
+            use_mpi: Whether to use MPI parallelization for population evaluation
         """
         
         if not HAS_PYMOO:
@@ -166,6 +242,14 @@ class GeneticAlgorithm(Optimizer):
         self.conv_iter = conv_iter
         self.reconstruction_callback = callback
         self.target_loss = target_loss
+        self.use_mpi = use_mpi and HAS_MPI
+        
+        if self.use_mpi:
+            self.mpi_rank = MPI.COMM_WORLD.Get_rank()
+            self.mpi_size = MPI.COMM_WORLD.Get_size()
+        else:
+            self.mpi_rank = 0
+            self.mpi_size = 1
         
         # GA-specific parameters
         self.population_size = population_size
@@ -175,7 +259,6 @@ class GeneticAlgorithm(Optimizer):
         self.crossover_eta = crossover_eta
         self.seed = seed
         
-        self.tolerance = tolerance
         self.current_loss = np.inf
         self.loss = loss
         self.volume_fractions = None
@@ -191,7 +274,10 @@ class GeneticAlgorithm(Optimizer):
         self.fitness_history = []
         self.no_improve_count = 0
         
-        logging.info(f"GeneticAlgorithm initialized with population_size={population_size}, max_iter={max_iter}")
+        msg = f"GeneticAlgorithm initialized with population_size={population_size}, max_iter={max_iter}"
+        if self.use_mpi:
+            msg += f" (MPI enabled: {self.mpi_size} ranks)"
+        logging.info(msg)
     
     def set_volume_fractions(self, volume_fractions: np.ndarray):
         """Set volume fractions to maintain."""
@@ -221,7 +307,8 @@ class GeneticAlgorithm(Optimizer):
             ms_shape=ms_shape,
             loss_function=self._evaluate_with_logging,
             volume_fractions=self.volume_fractions,
-            is_3D=self.is_3D
+            is_3D=self.is_3D,
+            use_mpi=self.use_mpi
         )
         
         # Define algorithm with adaptive parameters
@@ -398,9 +485,10 @@ if __name__ == "__main__":
     # Create and run GA optimizer (target_loss=0 means no early exit on target)
     ga = GeneticAlgorithm(
         max_iter=20,
-        population_size=200,
+        population_size=20,
         loss=simple_loss,
-        is_3D=True
+        is_3D=True,
+        use_mpi=True
     )
     
     # Run optimization
