@@ -435,59 +435,100 @@ if __name__ == "__main__":
     from mcrpy.descriptors.Tortuosity import Tortuosity
 
     logging.basicConfig(level=logging.WARNING)
-      
-    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-
-    # ms = np.load(minimal_example_ms)
-    # ms = ms[:,:,-2:-1]
-    # ms = np.zeros((5,5))
-    # ms[1,2] = 1
-    # ms[2,1] = 1
-    # ms[2,2] = 1
-    # ms[2,3] = 1
-    # ms[3,2] = 1
-    goal_ms = np.random.randint(0, 2, size=(7,7))
-    goal_ms_shape = goal_ms.shape
-
-    singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
-    goal_tort = singlephase_descriptor(goal_ms)
-    goal_tort = 3.5 #example
-
-    if MPI.COMM_WORLD.rank == 0:
-        print('='*60)
-        print(f'goal tort: {goal_tort}')
-
-    def simple_loss(ms):
-        return np.linalg.norm(singlephase_descriptor(ms) - goal_tort)
     
-    # Create test microstructure
-    start_ms = np.random.random(goal_ms_shape)
+    # Get MPI rank for conditional printing
+    try:
+        rank = MPI.COMM_WORLD.Get_rank()
+    except:
+        rank = 0
+      
+    # Define microstructure shape
+    ms_shape = (7, 7)
+    
+    # Create descriptor for tortuosity
+    singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
+    
+    # Prescribe target tortuosity value directly
+    goal_tort = 10
+    
+    if rank == 0:
+        print('='*60)
+        print(f'Microstructure shape: {ms_shape}')
+        print(f'Target tortuosity value: {goal_tort:.6f}')
+        print('='*60)
+
+    def loss_function(ms_array):
+        """
+        Loss function: minimize difference between current and goal tortuosity.
+        
+        Args:
+            ms_array: Microstructure array (flattened or shaped, can be float [0,1])
+        
+        Returns:
+            float: Loss value (L2 norm of tortuosity difference)
+        """
+        try:
+            # Ensure it's a binary/boolean microstructure
+            ms_binary = np.round(ms_array).astype(bool) if ms_array.dtype != bool else ms_array
+            
+            # Ensure proper shape
+            if ms_binary.ndim == 1:
+                ms_binary = ms_binary.reshape(ms_shape)
+            
+            # Compute tortuosity
+            current_tort = singlephase_descriptor(ms_binary)
+            
+            # Loss is difference from goal
+            loss = float(np.abs(current_tort - goal_tort))
+            return loss
+        except Exception as e:
+            # Return large penalty if computation fails
+            return 1e6
+    
+    # Create initial microstructure (random)
+    start_ms = np.random.random(ms_shape)
+    
+    if rank == 0:
+        print(f'Initial loss: {loss_function(start_ms):.6f}')
+        print()
     
     # Create MutableMicrostructure wrapper
     mm = MutableMicrostructure(start_ms)
     
-    # Create and run GA optimizer (target_loss=0 means no early exit on target)
+    # Create and run GA optimizer
     ga = GeneticAlgorithm(
-        max_iter=1000,
-        population_size=100,
-        loss=simple_loss,
-        is_3D=True,
+        max_iter=200,
+        population_size=150,
+        loss=loss_function,
+        is_3D=False,
+        target_loss=0.05,  # Stop when loss < 0.05
         use_mpi=True
     )
     
     # Run optimization
     result = ga.optimize(mm)
 
-    if MPI.COMM_WORLD.rank == 0:
+    # Print results (rank 0 only)
+    if rank == 0:
         # Get optimized microstructure
         optimized_ms = mm.xx
-        print(f"\nOptimization Results:")
-        print(f"  Initial loss: {simple_loss(ms=goal_ms)}")
-        print(f"  Optimized loss: {simple_loss(optimized_ms)}")
-        print(f"  Final loss: {ga.current_loss:.6f}")
-        print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
-        print(f'\noriginal ms:\n {goal_ms}\n')
-        print(f'optimized ms:\n {optimized_ms.reshape(goal_ms.shape)}')
-
-        print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
+        
+        # Ensure it's binary
+        optimized_ms_binary = np.round(optimized_ms).astype(bool)
+        
+        print('='*60)
+        print('Optimization Results:')
+        print('='*60)
+        print(f'Initial loss: {loss_function(start_ms):.6f}')
+        print(f'Final loss: {ga.current_loss:.6f}')
+        print(f'Generations run: {len(ga.fitness_history)}')
+        print(f'Total evaluations: {result.problem.eval_count}')
+        
+        # Compute optimized tortuosity
+        optimized_tort = singlephase_descriptor(optimized_ms_binary)
+        print()
+        print(f'Target tortuosity: {goal_tort:.6f}')
+        print(f'Optimized tortuosity: {optimized_tort:.6f}')
+        print(f'Tortuosity error: {np.abs(optimized_tort - goal_tort):.6f}')
+        print('='*60)
+        print(optimized_ms_binary.reshape(ms_shape).astype(int))
