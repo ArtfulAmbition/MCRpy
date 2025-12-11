@@ -116,13 +116,13 @@ class MicrostructureReconstructionProblem(Problem):
             binary_individual_reshaped = binary_individual.reshape(self.ms_shape)
             
            
-            # Berechne Loss
+            # Calculate Loss
             try:
                 loss = float(self.loss_function(binary_individual_reshaped))
             except Exception:
                 loss = np.inf
             
-            # Gesamtfitness = Loss + Penalty
+            # Gesamtfitness = Loss
             fitness = loss
             f.append(fitness)
             
@@ -431,16 +431,11 @@ def register() -> None:
 if __name__ == "__main__":
     import numpy as np
     from mcrpy.src.MutableMicrostructure import MutableMicrostructure
-    
-    logging.basicConfig(level=logging.INFO)
-    
-    # Test problem: Simple binary optimization
-    def simple_loss(current_ms):
-        return np.linalg.norm(singlephase_descriptor(current_ms) - mean_tort)
-    
     import os
     from mcrpy.descriptors.Tortuosity import Tortuosity
 
+    logging.basicConfig(level=logging.WARNING)
+      
     folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
 
@@ -452,25 +447,25 @@ if __name__ == "__main__":
     # ms[2,2] = 1
     # ms[2,3] = 1
     # ms[3,2] = 1
-    ms = np.random.randint(0, 2, size=(7,7))
-    ms_shape = ms.shape
+    goal_ms = np.random.randint(0, 2, size=(7,7))
+    goal_ms_shape = goal_ms.shape
 
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
-    mean_tort = singlephase_descriptor(ms)
-    mean_tort = 4.2 #example
-    if MPI.COMM_WORLD.rank == 0:
-        print(f'goal tort: {mean_tort}')
+    goal_tort = singlephase_descriptor(ms)
+    goal_tort = 4.2 #example
 
-    def simple_loss(current_ms):
-        return np.linalg.norm(singlephase_descriptor(current_ms) - mean_tort)
+    if MPI.COMM_WORLD.rank == 0:
+        print('='*60)
+        print(f'goal tort: {goal_tort}')
+
+    def simple_loss(ms, descriptor, goal_val):
+        return np.linalg.norm(descriptor(ms) - goal_val)
     
-    # Create test microstructure with matching volume fraction
-    # (ensures non-zero tortuosity descriptor for random candidates)
-    ms_shape = ms.shape
-    initial_ms = np.random.random(ms_shape)
+    # Create test microstructure
+    start_ms = np.random.random(goal_ms_shape)
     
     # Create MutableMicrostructure wrapper
-    mm = MutableMicrostructure(initial_ms)
+    mm = MutableMicrostructure(start_ms)
     
     # Create and run GA optimizer (target_loss=0 means no early exit on target)
     ga = GeneticAlgorithm(
@@ -485,7 +480,6 @@ if __name__ == "__main__":
     result = ga.optimize(mm)
 
     if MPI.COMM_WORLD.rank == 0:
-        print(f'result: {result}')
         # Get optimized microstructure
         optimized_ms = mm.xx
         print(f"\nOptimization Results:")
@@ -494,7 +488,6 @@ if __name__ == "__main__":
         print(f"  Final loss: {ga.current_loss:.6f}")
         print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
         print(f'\noriginal ms:\n {ms}\n')
-        # print(f'optimized ms:\n {optimized_ms.numpy().reshape(ms_shape)}')
         print(f'optimized ms:\n {optimized_ms.reshape(ms.shape)}')
 
         print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
