@@ -451,15 +451,15 @@ if __name__ == "__main__":
     goal_ms_shape = goal_ms.shape
 
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
-    goal_tort = singlephase_descriptor(ms)
-    goal_tort = 4.2 #example
+    goal_tort = singlephase_descriptor(goal_ms)
+    goal_tort = 3.5 #example
 
     if MPI.COMM_WORLD.rank == 0:
         print('='*60)
         print(f'goal tort: {goal_tort}')
 
-    def simple_loss(ms, descriptor, goal_val):
-        return np.linalg.norm(descriptor(ms) - goal_val)
+    def simple_loss(ms):
+        return np.linalg.norm(singlephase_descriptor(ms) - goal_tort)
     
     # Create test microstructure
     start_ms = np.random.random(goal_ms_shape)
@@ -469,7 +469,7 @@ if __name__ == "__main__":
     
     # Create and run GA optimizer (target_loss=0 means no early exit on target)
     ga = GeneticAlgorithm(
-        max_iter=100,
+        max_iter=1000,
         population_size=100,
         loss=simple_loss,
         is_3D=True,
@@ -483,11 +483,11 @@ if __name__ == "__main__":
         # Get optimized microstructure
         optimized_ms = mm.xx
         print(f"\nOptimization Results:")
-        print(f"  Initial loss: {simple_loss(initial_ms)}")
+        print(f"  Initial loss: {simple_loss(ms=goal_ms)}")
         print(f"  Optimized loss: {simple_loss(optimized_ms)}")
         print(f"  Final loss: {ga.current_loss:.6f}")
         print(f"  Fitness history: {ga.fitness_history[:5]}... (last: {ga.fitness_history[-1]:.6f})")
-        print(f'\noriginal ms:\n {ms}\n')
-        print(f'optimized ms:\n {optimized_ms.reshape(ms.shape)}')
+        print(f'\noriginal ms:\n {goal_ms}\n')
+        print(f'optimized ms:\n {optimized_ms.reshape(goal_ms.shape)}')
 
         print(f'tort value of optimized structure: {singlephase_descriptor(optimized_ms)}')
