@@ -50,7 +50,11 @@ def mpi_logging(message:str, rank:int=0, mode:str='info'):
             logging.debug(message)
         elif mode.lower() == 'info':
             logging.info(message)
-
+        elif mode.lower() == 'print':
+            print(message)
+        else:
+            raise TypeError(f'mode {mode} not implemented.')
+        
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
     
