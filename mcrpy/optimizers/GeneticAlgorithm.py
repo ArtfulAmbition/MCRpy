@@ -242,9 +242,11 @@ class GeneticAlgorithm(Optimizer):
         self.use_mpi = use_mpi and HAS_MPI
         
         if self.use_mpi:
-            self.rank = MPI.COMM_WORLD.Get_rank()
-            self.mpi_size = MPI.COMM_WORLD.Get_size()
+            self.comm = MPI.COMM_WORLD
+            self.rank = self.comm.Get_rank()
+            self.mpi_size = self.comm.Get_size()
         else:
+            self.comm = None
             self.rank = 0
             self.mpi_size = 1
         
@@ -259,6 +261,8 @@ class GeneticAlgorithm(Optimizer):
         self.current_loss = np.inf
         self.loss = loss
         self.use_multiphase = use_multiphase
+        self.last_tortuosity = None  # Store last computed tortuosity for logging
+        self.loss_metadata = {}  # Store metadata from loss function
         
         # Default callback if none provided
         if self.reconstruction_callback is None:
@@ -327,6 +331,30 @@ class GeneticAlgorithm(Optimizer):
         best_individual = np.round(res.X).astype(bool).reshape(ms_shape)
         best_loss = float(res.F[0])
         
+        # In MPI mode, synchronize best solution across all ranks
+        if self.use_mpi:
+            # Each rank sends its best loss to rank 0
+            all_losses = self.comm.gather(best_loss, root=0)
+            all_solutions = self.comm.gather(best_individual.flatten().astype(float), root=0)
+            
+            if self.rank == 0:
+                # Find globally best loss and corresponding solution
+                global_best_idx = np.argmin(all_losses)
+                global_best_loss = all_losses[global_best_idx]
+                global_best_solution = all_solutions[global_best_idx]
+                mpi_logging(f"Global best loss across {self.mpi_size} ranks (from rank {global_best_idx}): {global_best_loss:.6f}", rank=self.rank)
+            else:
+                global_best_loss = None
+                global_best_solution = None
+            
+            # Broadcast global best to all ranks
+            global_best_loss = self.comm.bcast(global_best_loss, root=0)
+            global_best_solution = self.comm.bcast(global_best_solution, root=0)
+            
+            # Update local best with global best
+            best_loss = global_best_loss
+            best_individual = global_best_solution.reshape(ms_shape).astype(bool)
+        
         self.current_loss = best_loss
         
         # Convert back to TensorFlow variable format and update
@@ -394,7 +422,18 @@ class GeneticAlgorithm(Optimizer):
         if best_fitness < self.current_loss:
             self.current_loss = best_fitness
             self.no_improve_count = 0
-            mpi_logging(f"Gen {algorithm.n_gen}: Best fitness improved to {best_fitness:.6f}",rank=self.rank)
+            
+            if self.rank == 0:
+                output = f"Gen {algorithm.n_gen}: Loss improved to {best_fitness:.6f}"
+                
+                # Add tortuosity info if available
+                if hasattr(self, 'last_tort_value') and self.last_tort_value[0] is not None:
+                    tort_value = self.last_tort_value[0]
+                    goal_tort = getattr(self, 'goal_tort_value', None)
+                    if goal_tort is not None:
+                        output += f" | Tortuosity: {tort_value:.6f} (target: {goal_tort:.6f})"
+                
+                mpi_logging(output, rank=self.rank)
         else:
             self.no_improve_count += 1
         
@@ -434,7 +473,7 @@ if __name__ == "__main__":
     import os
     from mcrpy.descriptors.Tortuosity import Tortuosity
 
-    logging.basicConfig(level=logging.WARNING)
+    logging.basicConfig(level=logging.INFO, format='%(message)s')
     
     # Get MPI rank for conditional printing
     try:
@@ -449,7 +488,7 @@ if __name__ == "__main__":
     singlephase_descriptor = Tortuosity.make_singlephase_descriptor()
     
     # Prescribe target tortuosity value directly
-    goal_tort = 10
+    goal_tort = 3.5
     
     if rank == 0:
         print('='*60)
@@ -457,6 +496,9 @@ if __name__ == "__main__":
         print(f'Target tortuosity value: {goal_tort:.6f}')
         print('='*60)
 
+    # Track last computed tortuosity value
+    last_tort = [None]  # Use list to allow modification in nested function
+    
     def loss_function(ms_array):
         """
         Loss function: minimize difference between current and goal tortuosity.
@@ -477,6 +519,7 @@ if __name__ == "__main__":
             
             # Compute tortuosity
             current_tort = singlephase_descriptor(ms_binary)
+            last_tort[0] = current_tort  # Store for logging
             
             # Loss is difference from goal
             loss = float(np.abs(current_tort - goal_tort))
@@ -490,20 +533,32 @@ if __name__ == "__main__":
     
     if rank == 0:
         print(f'Initial loss: {loss_function(start_ms):.6f}')
+        print(f'Initial tortuosity: {last_tort[0]:.6f}')
         print()
     
     # Create MutableMicrostructure wrapper
     mm = MutableMicrostructure(start_ms)
     
+    # Custom callback to print improvements with tortuosity
+    def custom_callback(gen):
+        """Custom callback to print loss and tortuosity when improving."""
+        pass  # Improvements will be logged by GA callback
+    
     # Create and run GA optimizer
     ga = GeneticAlgorithm(
-        max_iter=200,
+        max_iter=1000,
         population_size=150,
         loss=loss_function,
         is_3D=False,
         target_loss=0.05,  # Stop when loss < 0.05
-        use_mpi=True
+        use_mpi=True,
+        mutation_rate = 0.1,
+        callback=custom_callback
     )
+    
+    # Store reference to last_tort in GA for callback access
+    ga.last_tort_value = last_tort
+    ga.goal_tort_value = goal_tort
     
     # Run optimization
     result = ga.optimize(mm)
