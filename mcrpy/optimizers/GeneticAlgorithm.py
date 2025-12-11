@@ -58,20 +58,18 @@ def mpi_logging(message:str, rank:int=0, mode:str='info'):
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
     
-    def __init__(self, ms_shape, loss_function, volume_fractions=None, is_3D=False, use_mpi=False):
+    def __init__(self, ms_shape, loss_function, is_3D=False, use_mpi=False):
         """
         Initialize the problem.
         
         Args:
             ms_shape: Shape of the microstructure
             loss_function: Function that computes loss/fitness
-            volume_fractions: Optional volume fractions to maintain
             is_3D: Whether problem is 3D
             use_mpi: Whether to use MPI parallelization
         """
         self.ms_shape = ms_shape
         self.loss_function = loss_function
-        self.volume_fractions = volume_fractions
         self.is_3D = is_3D
         self.eval_count = 0
         self.use_mpi = use_mpi and HAS_MPI
@@ -117,14 +115,7 @@ class MicrostructureReconstructionProblem(Problem):
             binary_individual = np.round(individual).astype(np.float64)
             binary_individual_reshaped = binary_individual.reshape(self.ms_shape)
             
-            # Prüfe Volume Fractions
-            if self.volume_fractions is not None:
-                current_vf = np.sum(binary_individual_reshaped) / binary_individual_reshaped.size
-                # Penalisiere Abweichung von Volume Fractions
-                vf_penalty = 10.0 * np.abs(current_vf - self.volume_fractions[1])
-            else:
-                vf_penalty = 0.0
-            
+           
             # Berechne Loss
             try:
                 loss = float(self.loss_function(binary_individual_reshaped))
@@ -132,7 +123,7 @@ class MicrostructureReconstructionProblem(Problem):
                 loss = np.inf
             
             # Gesamtfitness = Loss + Penalty
-            fitness = loss + vf_penalty
+            fitness = loss
             f.append(fitness)
             
             self.eval_count += 1
@@ -161,19 +152,13 @@ class MicrostructureReconstructionProblem(Problem):
             individual = x[i]
             binary_individual = np.round(individual).astype(np.float64)
             binary_individual_reshaped = binary_individual.reshape(self.ms_shape)
-            
-            if self.volume_fractions is not None:
-                current_vf = np.sum(binary_individual_reshaped) / binary_individual_reshaped.size
-                vf_penalty = 10.0 * np.abs(current_vf - self.volume_fractions[1])
-            else:
-                vf_penalty = 0.0
-            
+                       
             try:
                 loss = float(self.loss_function(binary_individual_reshaped))
             except Exception:
                 loss = np.inf
             
-            fitness = loss + vf_penalty
+            fitness = loss
             local_fitnesses.append(fitness)
         
         # Gather all fitnesses to rank 0
@@ -273,7 +258,6 @@ class GeneticAlgorithm(Optimizer):
         
         self.current_loss = np.inf
         self.loss = loss
-        self.volume_fractions = None
         self.use_multiphase = use_multiphase
         
         # Default callback if none provided
@@ -290,12 +274,7 @@ class GeneticAlgorithm(Optimizer):
         if self.use_mpi:
             msg += f" (MPI enabled: {self.mpi_size} ranks)"
         mpi_logging(msg,rank=self.rank)
-    
-    def set_volume_fractions(self, volume_fractions: np.ndarray):
-        """Set volume fractions to maintain."""
-        self.volume_fractions = volume_fractions
-        mpi_logging(f"Volume fractions set: {volume_fractions}",rank=self.rank)
-    
+        
     def optimize(self, ms):
         """
         Run genetic algorithm optimization.
@@ -318,7 +297,6 @@ class GeneticAlgorithm(Optimizer):
         problem = MicrostructureReconstructionProblem(
             ms_shape=ms_shape,
             loss_function=self._evaluate_with_logging,
-            volume_fractions=self.volume_fractions,
             is_3D=self.is_3D,
             use_mpi=self.use_mpi
         )
