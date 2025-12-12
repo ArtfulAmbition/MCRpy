@@ -26,6 +26,7 @@ from pymoo.optimize import minimize
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.mutation.bitflip import BitflipMutation 
+from pymoo.core.mutation import Mutation
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.core.sampling import Sampling
 import logging
@@ -61,6 +62,41 @@ class DiverseRandomSampling(Sampling):
             phases = np.random.randint(0, n_phases, problem.n_var)
             X[i] = phases
         
+        return X
+
+
+class PhaseBitflip(Mutation):
+    """Safe bit-flip style mutation for integer phase variables.
+
+    Instead of flipping binary bits (which may produce negative values
+    when interpreted), this mutation replaces selected variables with a
+    random phase in the valid range [0, n_phases-1].
+    """
+    def __init__(self, prob=0.5, prob_var=0.1, n_phases: int = 2):
+        super().__init__()
+        self.prob = prob
+        self.prob_var = prob_var
+        self.n_phases = int(n_phases)
+
+    def _do(self, problem, X, **kwargs):
+        # X: (n_individuals, n_var)
+        if self.n_phases <= 1:
+            return X
+
+        n_pop, n_var = X.shape
+        for i in range(n_pop):
+            if np.random.rand() <= self.prob:
+                for j in range(n_var):
+                    if np.random.rand() < self.prob_var:
+                        old = int(X[i, j])
+                        # choose a new phase different from old (try limited times)
+                        new = np.random.randint(0, self.n_phases)
+                        tries = 0
+                        while new == old and tries < 5:
+                            new = np.random.randint(0, self.n_phases)
+                            tries += 1
+                        X[i, j] = new
+
         return X
 
 
@@ -205,8 +241,9 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         pop_size=pop_size,
         sampling=DiverseRandomSampling(),
         crossover=SBX(prob=0.9, eta=15),
-        mutation=BitflipMutation(prob=0.5, prob_var=0.3),
-        #mutation=PM(prob=1.0/problem.n_var, eta=20),  # Adaptive mutation: 1/n_var per variable
+        # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
+        mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases),
+        # Alternatively: mutation=PM(prob=1.0/problem.n_var, eta=20),
         eliminate_duplicates=True
     )
     
@@ -302,9 +339,9 @@ if __name__ == "__main__":
     print("# (Based on proven achievable pattern from 4x4)")
     print("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(4, 4),
+        ms_shape=(7, 7),
         n_phases=3,
-        target_tortuosity=2.5,
+        target_tortuosity=3.5,
         max_generations=100,
         pop_size=150,
         phase_of_interest=0, 
