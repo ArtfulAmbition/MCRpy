@@ -37,13 +37,28 @@ from mcrpy.descriptors.Tortuosity import Tortuosity
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
-
-
-
-
-
 # Also set Python-side logger to ERROR for tensorflow logger (if TF is imported later)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
+
+from mpi4py import MPI
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+mpi_size = MPI.COMM_WORLD.Get_size()
+
+print(f'rank: {rank}')
+comm.Barrier()
+
+def mpi_logging(message:str='', mode:str='print', end:str='\n'):
+    #assert isinstance(message,str)
+    if rank==0:
+        if mode.lower() == 'debug':
+            logging.debug(message)
+        elif mode.lower() == 'info':
+            logging.info(message)
+        elif mode.lower() == 'print':
+            print(message,end=end)
+        else:
+            raise TypeError(f'mode {mode} not implemented.')
 
 
 
@@ -209,19 +224,19 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         np.random.seed(seed)
     
     if verbose:
-        print("\n" + "="*70)
-        print("MICROSTRUCTURE TORTUOSITY OPTIMIZATION (MCRpy)")
-        print("="*70)
-        print(f"Shape: {ms_shape}")
-        print(f"Number of phases: {n_phases}")
-        print(f"Target tortuosity: {target_tortuosity:.6f}")
-        print(f"Phase of interest: {phase_of_interest}")
-        print(f"Connectivity: {connectivity}")
-        print(f"Method: {method}")
-        print(f"Direction: {direction}")
-        print(f"Population size: {pop_size}")
-        print(f"Max generations: {max_generations}")
-        print("="*70 + "\n")
+        mpi_logging("\n" + "="*70)
+        mpi_logging("MICROSTRUCTURE TORTUOSITY OPTIMIZATION (MCRpy)")
+        mpi_logging("="*70)
+        mpi_logging(f"Shape: {ms_shape}")
+        mpi_logging(f"Number of phases: {n_phases}")
+        mpi_logging(f"Target tortuosity: {target_tortuosity:.6f}")
+        mpi_logging(f"Phase of interest: {phase_of_interest}")
+        mpi_logging(f"Connectivity: {connectivity}")
+        mpi_logging(f"Method: {method}")
+        mpi_logging(f"Direction: {direction}")
+        mpi_logging(f"Population size: {pop_size}")
+        mpi_logging(f"Max generations: {max_generations}")
+        mpi_logging("="*70 + "\n")
     
     # Configure logging to suppress intermediate messages
     logging.basicConfig(level=logging.CRITICAL, force=True)
@@ -262,10 +277,10 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         if current_best < best_loss_so_far[0]:
             best_loss_so_far[0] = current_best
             if verbose:
-                print(f"Gen {algorithm.n_gen}: Loss improved to {current_best:.6f}")
+                mpi_logging(f"Gen {algorithm.n_gen}: Loss improved to {current_best:.6f}")
         else:
             if verbose:
-                print(f"Gen {algorithm.n_gen}: no improvement.",end='\r')
+                mpi_logging(f"Gen {algorithm.n_gen}: no improvement.",end='\r')
 
 
         # Early stop if a loss threshold is provided and reached
@@ -314,19 +329,19 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
     final_tort = float(descriptor(optimized_ms))
     
     if verbose:
-        print("\n" + "="*70)
-        print("OPTIMIZATION RESULTS")
-        print("="*70)
-        print(f"Final loss: {best_loss:.6f}")
-        print(f"Target tortuosity: {target_tortuosity:.6f}")
-        print(f"Optimized tortuosity: {final_tort:.6f}")
-        print(f"Tortuosity error: {np.abs(final_tort - target_tortuosity):.6f}")
-        print(f"Generations: {res.algorithm.n_gen}")
-        print(f"Total evaluations: {problem.eval_count}")
-        print("="*70)
-        print("\nOptimized microstructure:")
-        print(optimized_ms)
-        print()
+        mpi_logging("\n" + "="*70)
+        mpi_logging("OPTIMIZATION RESULTS")
+        mpi_logging("="*70)
+        mpi_logging(f"Final loss: {best_loss:.6f}")
+        mpi_logging(f"Target tortuosity: {target_tortuosity:.6f}")
+        mpi_logging(f"Optimized tortuosity: {final_tort:.6f}")
+        mpi_logging(f"Tortuosity error: {np.abs(final_tort - target_tortuosity):.6f}")
+        mpi_logging(f"Generations: {res.algorithm.n_gen}")
+        mpi_logging(f"Total evaluations: {problem.eval_count}")
+        mpi_logging("="*70)
+        mpi_logging("\nOptimized microstructure:")
+        mpi_logging(optimized_ms)
+        mpi_logging()
     
     return {
         'optimized_ms': optimized_ms,
@@ -344,9 +359,9 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
 if __name__ == "__main__":
     
     # # Example 1: Simple 2D microstructure - find phase 1 with target tortuosity
-    # print("\n" + "#"*70)
-    # print("# EXAMPLE 1: 2D (7x7), 2 phases, optimize PHASE 1, target tort=1.2")
-    # print("#"*70)
+    # mpi_logging("\n" + "#"*70)
+    # mpi_logging("# EXAMPLE 1: 2D (7x7), 2 phases, optimize PHASE 1, target tort=1.2")
+    # mpi_logging("#"*70)
     # result_2d = run_ga_optimization(
     #     ms_shape=(7, 7),
     #     n_phases=2,
@@ -363,17 +378,17 @@ if __name__ == "__main__":
 
     # Example: 2D microstructure with target tortuosity 2.5
     # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
-    print("\n" + "#"*70)
-    print("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
-    print("# (Based on proven achievable pattern from 4x4)")
-    print("#"*70)
+    mpi_logging("\n" + "#"*70)
+    mpi_logging("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
+    mpi_logging("# (Based on proven achievable pattern from 4x4)")
+    mpi_logging("#"*70)
     result_2d = run_ga_optimization(
         ms_shape=(7, 7),
         n_phases=5,
         target_tortuosity=3,
         max_generations=200,
         pop_size=150,
-        phase_of_interest=4, 
+        phase_of_interest=0, 
         connectivity='sides',
         method='DSPSM',
         direction=0,
@@ -383,9 +398,9 @@ if __name__ == "__main__":
     )
 
     # # Example 3: Simple 3D microstructure - find phase 2 with target tortuosity
-    # print("\n" + "#"*70)
-    # print("# EXAMPLE 1: 2D (7x7x7), 3 phases, optimize PHASE 2, target tort=1.2")
-    # print("#"*70)
+    # mpi_logging("\n" + "#"*70)
+    # mpi_logging("# EXAMPLE 1: 2D (7x7x7), 3 phases, optimize PHASE 2, target tort=1.2")
+    # mpi_logging("#"*70)
     # result_2d = run_ga_optimization(
     #     ms_shape=(7, 7, 7),
     #     n_phases=3,
