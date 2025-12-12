@@ -80,7 +80,7 @@ class PhaseBitflip(Mutation):
 
     def _do(self, problem, X, **kwargs):
         # X: (n_individuals, n_var)
-        if self.n_phases <= 1:
+        if self.n_phases <= 1: #if there is just one phase (only zeros), don't do anything. Doesn't make a lot of sense, just
             return X
 
         n_pop, n_var = X.shape
@@ -243,8 +243,8 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         sampling=DiverseRandomSampling(),
         crossover=SBX(prob=0.9, eta=15),
         # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
-        mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases),
-        # Alternatively: mutation=PM(prob=1.0/problem.n_var, eta=20),
+        #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases),
+        mutation=PM(prob=0.5, eta=1),
         eliminate_duplicates=True
     )
     
@@ -271,8 +271,6 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
             stop_data['n_gen'] = int(algorithm.n_gen)
             raise StopIteration("early stop: loss below threshold")
         
-        
-    
     # Run optimization (catch StopIteration from early-stop callback)
     try:
         res = minimize(
@@ -364,10 +362,10 @@ if __name__ == "__main__":
     print("# (Based on proven achievable pattern from 4x4)")
     print("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(7, 7),
+        ms_shape=(20, 20),
         n_phases=3,
-        target_tortuosity=3.5,
-        max_generations=200,
+        target_tortuosity=10,
+        max_generations=1000,
         pop_size=150,
         phase_of_interest=0, 
         connectivity='sides',
