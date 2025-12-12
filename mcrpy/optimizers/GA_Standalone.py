@@ -13,28 +13,31 @@ Supports:
 
 
 import os
-import numpy as np
-from pymoo.algorithms.soo.nonconvex.ga import GA
-from pymoo.core.problem import Problem
-from pymoo.optimize import minimize
-from pymoo.operators.crossover.sbx import SBX
-from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import FloatRandomSampling
-from pymoo.core.sampling import Sampling
-import logging
-import warnings
-from mcrpy.descriptors.Tortuosity import Tortuosity
-
-
-# Suppress warnings
-warnings.filterwarnings("ignore")
-
 # Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
 # - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
 #   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
 # - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
 os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
 os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
+import numpy as np
+from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.core.problem import Problem
+from pymoo.optimize import minimize
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.mutation.bitflip import BitflipMutation 
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.core.sampling import Sampling
+import logging
+import warnings
+from mcrpy.descriptors.Tortuosity import Tortuosity
+
+# Suppress warnings
+warnings.filterwarnings("ignore")
+
+
+
+
 
 # Also set Python-side logger to ERROR for tensorflow logger (if TF is imported later)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
@@ -196,12 +199,14 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         voxel_dimension=voxel_dimension
     )
     
-    # Define algorithm
+    # Define algorithm with tuned parameters for discrete optimization
+    # For discrete (integer) problems, we need higher mutation rates
     algorithm = GA(
         pop_size=pop_size,
         sampling=DiverseRandomSampling(),
         crossover=SBX(prob=0.9, eta=15),
-        mutation=PM(eta=20),
+        mutation=BitflipMutation(prob=0.5, prob_var=0.3),
+        #mutation=PM(prob=1.0/problem.n_var, eta=20),  # Adaptive mutation: 1/n_var per variable
         eliminate_duplicates=True
     )
     
@@ -290,21 +295,23 @@ if __name__ == "__main__":
     #     verbose=True
     # )
 
-    # Example 2: Simple 2D microstructure - find phase 2 with target tortuosity
+    # Example: 2D microstructure with target tortuosity 2.5
+    # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
     print("\n" + "#"*70)
-    print("# EXAMPLE 1: 2D (7x7), 3 phases, optimize PHASE 2, target tort=1.2")
+    print("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
+    print("# (Based on proven achievable pattern from 4x4)")
     print("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(7, 7),
+        ms_shape=(4, 4),
         n_phases=2,
-        target_tortuosity=3.5,
+        target_tortuosity=2.5,
         max_generations=1000,
-        pop_size=510,
+        pop_size=150,
         phase_of_interest=0, 
         connectivity='sides',
         method='DSPSM',
         direction=0,
-        seed=42,
+        #seed=42,
         verbose=True
     )
 
