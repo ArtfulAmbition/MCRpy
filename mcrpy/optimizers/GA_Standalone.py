@@ -243,7 +243,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         sampling=DiverseRandomSampling(),
         crossover=SBX(prob=0.9, eta=15),
         # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
-        #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases),
+        #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases), #seems to work well for very small examples
         mutation=PM(prob=0.5, eta=1),
         eliminate_duplicates=True
     )
@@ -261,6 +261,10 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
             best_loss_so_far[0] = current_best
             if verbose:
                 print(f"Gen {algorithm.n_gen}: Loss improved to {current_best:.6f}")
+        else:
+            if verbose:
+                print(f"Gen {algorithm.n_gen}: no improvement.",end='\r')
+
 
         # Early stop if a loss threshold is provided and reached
         if stop_loss_tol is not None and current_best <= stop_loss_tol:
@@ -355,40 +359,41 @@ if __name__ == "__main__":
     #     verbose=True
     # )
 
-    # Example: 2D microstructure with target tortuosity 2.5
-    # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
+    # # Example: 2D microstructure with target tortuosity 2.5
+    # # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
+    # print("\n" + "#"*70)
+    # print("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
+    # print("# (Based on proven achievable pattern from 4x4)")
+    # print("#"*70)
+    # result_2d = run_ga_optimization(
+    #     ms_shape=(20, 20),
+    #     n_phases=3,
+    #     target_tortuosity=10,
+    #     max_generations=1000,
+    #     pop_size=150,
+    #     phase_of_interest=0, 
+    #     connectivity='sides',
+    #     method='DSPSM',
+    #     direction=0,
+    #     #seed=42,
+    #     verbose=True
+    # )
+
+    # Example 3: Simple 3D microstructure - find phase 2 with target tortuosity
     print("\n" + "#"*70)
-    print("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
-    print("# (Based on proven achievable pattern from 4x4)")
+    print("# EXAMPLE 1: 2D (7x7x7), 3 phases, optimize PHASE 2, target tort=1.2")
     print("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(20, 20),
+        ms_shape=(7, 7, 7),
         n_phases=3,
         target_tortuosity=10,
         max_generations=1000,
         pop_size=150,
-        phase_of_interest=0, 
+        phase_of_interest=1, 
         connectivity='sides',
         method='DSPSM',
         direction=0,
+        stop_loss_tol = 1e-4,
         #seed=42,
         verbose=True
     )
-
-    # # Example 3: Simple 3D microstructure - find phase 2 with target tortuosity
-    # print("\n" + "#"*70)
-    # print("# EXAMPLE 1: 2D (7x7x7), 3 phases, optimize PHASE 2, target tort=1.2")
-    # print("#"*70)
-    # result_2d = run_ga_optimization(
-    #     ms_shape=(7, 7, 7),
-    #     n_phases=3,
-    #     target_tortuosity=1.2,
-    #     max_generations=150,
-    #     pop_size=60,
-    #     phase_of_interest=2, 
-    #     connectivity='sides',
-    #     method='DSPSM',
-    #     direction=0,
-    #     seed=42,
-    #     verbose=True
-    # )
