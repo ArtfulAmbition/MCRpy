@@ -303,9 +303,9 @@ if __name__ == "__main__":
     print("#"*70)
     result_2d = run_ga_optimization(
         ms_shape=(4, 4),
-        n_phases=2,
+        n_phases=3,
         target_tortuosity=2.5,
-        max_generations=1000,
+        max_generations=100,
         pop_size=150,
         phase_of_interest=0, 
         connectivity='sides',
