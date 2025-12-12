@@ -24,9 +24,19 @@ import warnings
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
+import os
+
+# Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
+# - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
+#   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
+# - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
+
+# Also set Python-side logger to ERROR for tensorflow logger (if TF is imported later)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 
-# Import tortuosity descriptor from MCRpy
+# Import tortuosity descriptor from MCRpy (this will import TensorFlow internally)
 from mcrpy.descriptors.Tortuosity import Tortuosity
 
 
