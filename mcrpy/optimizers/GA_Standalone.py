@@ -11,6 +11,8 @@ Supports:
   - Customizable connectivity and method (DSPSM/SSPSM)
 """
 
+
+import os
 import numpy as np
 from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.core.problem import Problem
@@ -21,10 +23,11 @@ from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.core.sampling import Sampling
 import logging
 import warnings
+from mcrpy.descriptors.Tortuosity import Tortuosity
+
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
-import os
 
 # Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
 # - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
@@ -36,8 +39,6 @@ os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
 # Also set Python-side logger to ERROR for tensorflow logger (if TF is imported later)
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 
-# Import tortuosity descriptor from MCRpy (this will import TensorFlow internally)
-from mcrpy.descriptors.Tortuosity import Tortuosity
 
 
 class DiverseRandomSampling(Sampling):
@@ -294,12 +295,12 @@ if __name__ == "__main__":
     print("# EXAMPLE 1: 2D (7x7), 3 phases, optimize PHASE 2, target tort=1.2")
     print("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(3, 3),
+        ms_shape=(7, 7),
         n_phases=2,
-        target_tortuosity=5,
+        target_tortuosity=3.5,
         max_generations=1000,
-        pop_size=150,
-        phase_of_interest=2, 
+        pop_size=510,
+        phase_of_interest=0, 
         connectivity='sides',
         method='DSPSM',
         direction=0,
