@@ -175,6 +175,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
                        phase_of_interest=0, connectivity='sides',
                        method='DSPSM', direction=0,
                        voxel_dimension=(1, 1, 1),
+                       stop_loss_tol: float = None,
                        seed=None, verbose=True):
     """
     Run genetic algorithm to optimize microstructure tortuosity
@@ -250,22 +251,46 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
     # Callback for progress tracking
     best_loss_so_far = [float('inf')]
     
-    def callback(algo):
-        current_best = algo.pop.get("F").min()
+    stop_data = {}
+
+    def callback(algorithm):
+        current_pop = algorithm.pop
+        F = current_pop.get("F")
+        current_best = float(np.min(F))
         if current_best < best_loss_so_far[0]:
             best_loss_so_far[0] = current_best
             if verbose:
-                print(f"Gen {algo.n_gen}: Loss improved to {current_best:.6f}")
+                print(f"Gen {algorithm.n_gen}: Loss improved to {current_best:.6f}")
+
+        # Early stop if a loss threshold is provided and reached
+        if stop_loss_tol is not None and current_best <= stop_loss_tol:
+            best_idx = int(np.argmin(F))
+            Xpop = current_pop.get("X")
+            stop_data['X'] = Xpop[best_idx].copy()
+            stop_data['F'] = float(F[best_idx])
+            stop_data['n_gen'] = int(algorithm.n_gen)
+            raise StopIteration("early stop: loss below threshold")
+        
+        
     
-    # Run optimization
-    res = minimize(
-        problem,
-        algorithm,
-        ('n_gen', max_generations),
-        seed=seed,
-        verbose=False,
-        callback=callback
-    )
+    # Run optimization (catch StopIteration from early-stop callback)
+    try:
+        res = minimize(
+            problem,
+            algorithm,
+            ('n_gen', max_generations),
+            seed=seed,
+            verbose=False,
+            callback=callback
+        )
+    except StopIteration:
+        # Build a minimal result-like object from stop_data
+        class SimpleRes:
+            pass
+        res = SimpleRes()
+        res.X = stop_data['X']
+        res.F = np.array([stop_data['F']])
+        res.algorithm = type('A', (), {'n_gen': stop_data.get('n_gen', 0)})()
     
     # Extract best solution
     best_individual = res.X
@@ -342,7 +367,7 @@ if __name__ == "__main__":
         ms_shape=(7, 7),
         n_phases=3,
         target_tortuosity=3.5,
-        max_generations=100,
+        max_generations=200,
         pop_size=150,
         phase_of_interest=0, 
         connectivity='sides',
