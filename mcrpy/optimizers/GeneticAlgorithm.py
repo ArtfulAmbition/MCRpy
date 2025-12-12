@@ -42,7 +42,6 @@ except ImportError:
     HAS_MPI = False
     logging.debug("mpi4py not installed. GA will run serially. Install with: pip install mpi4py")
 
-
 def mpi_logging(message:str, rank:int=0, mode:str='info'):
     assert isinstance(message,str)
     if rank==0:
@@ -58,7 +57,7 @@ def mpi_logging(message:str, rank:int=0, mode:str='info'):
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
     
-    def __init__(self, ms_shape, loss_function, is_3D=False, use_mpi=False):
+    def __init__(self, ms_shape, loss_function, is_3D=False, use_mpi=False, n_phases=2):
         """
         Initialize the problem.
         
@@ -72,14 +71,13 @@ class MicrostructureReconstructionProblem(Problem):
         self.loss_function = loss_function
         self.is_3D = is_3D
         self.eval_count = 0
+        self.n_phases = n_phases
         self.use_mpi = use_mpi and HAS_MPI
         
         if self.use_mpi:
             self.comm = MPI.COMM_WORLD
             self.rank = self.comm.Get_rank()
             self.size = self.comm.Get_size()
-            if self.rank == 0:
-                mpi_logging(f"MPI enabled: {self.size} ranks available for parallelization",rank=self.rank)
         else:
             self.comm = None
             self.rank = 0
@@ -89,15 +87,15 @@ class MicrostructureReconstructionProblem(Problem):
         
         # Problem definition: Binary variables [0, 1]
         super().__init__(
-            n_var=n_var,
-            n_obj=1,
-            n_constr=0,
+            n_var=n_var, #number of arguments
+            n_obj=1, #number of functions to minimize
+            n_constr=0, #number of constraints
             type_var=float
         )
         
         # Set bounds explicitly as arrays for pymoo
         self.xl = np.zeros(n_var)
-        self.xu = np.ones(n_var)
+        self.xu = np.ones(n_var)*self.n_phases
     
     def _evaluate(self, x, out, *args, **kwargs):
         """Evaluate population, optionally parallelized with MPI."""
