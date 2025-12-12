@@ -29,6 +29,8 @@ from pymoo.operators.mutation.bitflip import BitflipMutation
 from pymoo.core.mutation import Mutation
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.core.sampling import Sampling
+from pymoo.operators.repair.rounding import RoundingRepair
+from pymoo.operators.sampling.rnd import IntegerRandomSampling
 import logging
 import warnings
 from mcrpy.descriptors.Tortuosity import Tortuosity
@@ -241,10 +243,10 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
     algorithm = GA(
         pop_size=pop_size,
         sampling=DiverseRandomSampling(),
-        crossover=SBX(prob=0.9, eta=15),
+        crossover=SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair()),
         # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
         #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases), #seems to work well for very small examples
-        mutation=PM(prob=0.5, eta=1),
+        mutation=PM(prob=0.5, eta=1,vtype=float, repair=RoundingRepair()),
         eliminate_duplicates=True
     )
     
@@ -359,37 +361,19 @@ if __name__ == "__main__":
     #     verbose=True
     # )
 
-    # # Example: 2D microstructure with target tortuosity 2.5
-    # # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
-    # print("\n" + "#"*70)
-    # print("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
-    # print("# (Based on proven achievable pattern from 4x4)")
-    # print("#"*70)
-    # result_2d = run_ga_optimization(
-    #     ms_shape=(20, 20),
-    #     n_phases=3,
-    #     target_tortuosity=10,
-    #     max_generations=1000,
-    #     pop_size=150,
-    #     phase_of_interest=0, 
-    #     connectivity='sides',
-    #     method='DSPSM',
-    #     direction=0,
-    #     #seed=42,
-    #     verbose=True
-    # )
-
-    # Example 3: Simple 3D microstructure - find phase 2 with target tortuosity
+    # Example: 2D microstructure with target tortuosity 2.5
+    # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
     print("\n" + "#"*70)
-    print("# EXAMPLE 1: 2D (7x7x7), 3 phases, optimize PHASE 2, target tort=1.2")
+    print("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
+    print("# (Based on proven achievable pattern from 4x4)")
     print("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(7, 7, 7),
-        n_phases=3,
-        target_tortuosity=10,
-        max_generations=1000,
+        ms_shape=(7, 7),
+        n_phases=5,
+        target_tortuosity=3,
+        max_generations=200,
         pop_size=150,
-        phase_of_interest=1, 
+        phase_of_interest=4, 
         connectivity='sides',
         method='DSPSM',
         direction=0,
@@ -397,3 +381,22 @@ if __name__ == "__main__":
         #seed=42,
         verbose=True
     )
+
+    # # Example 3: Simple 3D microstructure - find phase 2 with target tortuosity
+    # print("\n" + "#"*70)
+    # print("# EXAMPLE 1: 2D (7x7x7), 3 phases, optimize PHASE 2, target tort=1.2")
+    # print("#"*70)
+    # result_2d = run_ga_optimization(
+    #     ms_shape=(7, 7, 7),
+    #     n_phases=3,
+    #     target_tortuosity=10,
+    #     max_generations=1000,
+    #     pop_size=150,
+    #     phase_of_interest=1, 
+    #     connectivity='sides',
+    #     method='DSPSM',
+    #     direction=0,
+    #     stop_loss_tol = 1e-4,
+    #     #seed=42,
+    #     verbose=True
+    # )
