@@ -63,23 +63,67 @@ def mpi_logging(message:str='', mode:str='print', end:str='\n'):
 
 
 class DiverseRandomSampling(Sampling):
-    """Custom sampling to ensure phase diversity in initial population"""
+    """Custom sampling to ensure phase diversity in initial population.
+    
+    Optionally creates an initial connected path for the phase_of_interest
+    to provide a better starting point for tortuosity optimization.
+    """
     
     def _do(self, problem, n_samples, **kwargs):
         """Generate diverse initial population with mixed phases.
-        Arg problem is a pymoo problem."""
-        X = np.zeros((n_samples, problem.n_var), dtype=int)
+        Optionally ensures connectivity for phase_of_interest.
+        """
+        n_phases = int(problem.xu[0]) + 1
         
-        n_phases = problem.xu[0] + 1  # Assuming all variables have same bounds. 
-        # xu is the upper bound of allowed argument for the function to be optimized, 
-        # that is 0 for one phase, 1 for two phases etc. Therefore the plus 1 is required.
+        start_with_connected_path = False
+        if start_with_connected_path:
+            X = np.zeros((n_samples, problem.n_var), dtype=int)
+            
+            ms_shape = problem.ms_shape
+            dimensionality = len(ms_shape)
+            phase_of_interest = getattr(problem, 'phase_of_interest', 0)
+            direction = getattr(problem, 'direction', 0)
+            
+            for i in range(n_samples):
+                # Generate random microstructure
+                init_ms = np.random.randint(0, n_phases, ms_shape).astype(int)
+                
+                # If phase_of_interest is valid and present, create a connected path
+                if 0 <= phase_of_interest < n_phases:
+                    self._add_connected_path(init_ms, phase_of_interest, direction, dimensionality)
+                
+                X[i] = init_ms.flatten()
+            
+            return X
+        else:
+            X = np.random.randint(0,n_phases-1,size=(n_samples, problem.n_var), dtype=int)
+            return X
+    
+    def _add_connected_path(self, ms, phase, direction, dim):
+        """Add a connected path for the given phase along the specified direction."""
         
-        for i in range(n_samples):
-            # Generate random microstructure with balanced phase distribution
-            phases = np.random.randint(0, n_phases, problem.n_var)
-            X[i] = phases
+        other_directions = [other_direction for other_direction in (0,1,2) if other_direction!= direction]
         
-        return X
+        if dim == 2:
+            nx, ny = ms.shape
+            other_direction = other_directions[0]
+            rand_int = np.random.randint(0, ms.shape[other_direction])
+            if direction == 0:  # x-direction: left to right
+                ms[:,rand_int] = phase
+            elif direction == 1:  # y-direction: top to bottom
+                 ms[rand_int,:] = phase
+        elif dim == 3:
+            nx, ny, nz = ms.shape
+            other_direction1 = other_directions[0]
+            other_direction2 = other_directions[1]
+            rand_int1 = np.random.randint(0, other_direction1)
+            rand_int2 = np.random.randint(0, other_direction2)
+            if direction == 0:  # x-direction: left to right
+               ms[:,rand_int1,rand_int2] = phase
+            elif direction == 1:  # y-direction: top to bottom
+               ms[rand_int1,:,rand_int2] = phase
+            elif direction == 2:  # z-direction: front to back
+               ms[rand_int1,rand_int2,:] = phase
 
 
 class PhaseBitflip(Mutation):
@@ -383,7 +427,7 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(7, 7),
+        ms_shape=(20, 20),
         n_phases=5,
         target_tortuosity=3,
         max_generations=200,

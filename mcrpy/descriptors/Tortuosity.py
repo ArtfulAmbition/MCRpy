@@ -42,7 +42,7 @@ class Tortuosity(PhaseDescriptor):
         direction : int = 0, #0:x, 1:y, 2:z
         is_direction_reversed:bool = False, # The calculation of the Tortuosity is direction dependent. 
                                             # Set is_direction_reversed to True if the calculation should be from highest values in specofied direction to smallest values.
-        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -224,29 +224,36 @@ class Tortuosity(PhaseDescriptor):
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             
+            plotting=True
+
+            dimensionality = len(ms_phase_of_interest.shape)
+            if dimensionality == 3 and not any(dim == 1 for dim in ms_phase_of_interest.shape):
+                total_number_slices = ms_phase_of_interest.shape[direction]
+                skeleton_slice_list = []
+                for slice_number in range(total_number_slices):
+                    # Get the slice from the original ndarray
+                    ms_slice = slice_ndarray(data=ms_phase_of_interest,axis=direction,index=slice_number)
+
+                    # Apply medial_axis to the sliced data
+                    skeleton_slice = medial_axis(ms_slice)
+
+                    # Append the resulting skeleton slice to the list
+                    skeleton_slice_list.append(skeleton_slice)
 
 
-            total_number_slices = ms_phase_of_interest.shape[direction]
-            skeleton_slice_list = []
-            for slice_number in range(total_number_slices):
-                # Get the slice from the original ndarray
-                ms_slice = slice_ndarray(data=ms_phase_of_interest,axis=direction,index=slice_number)
+                # Stack the list of skeleton slices back into an ndarray, maintaining the original shape
+                skeleton_ms = np.stack(skeleton_slice_list, axis=direction)
 
-                # Apply medial_axis to the sliced data
-                skeleton_slice = medial_axis(ms_slice)
+                if plotting:
+                    plot_slices(data=ms_phase_of_interest,direction=direction,block=False)
+                    plot_slices(data=skeleton_ms,direction=direction)
+            else:
+                
+                skeleton_ms = medial_axis(ms_phase_of_interest)
 
-                # Append the resulting skeleton slice to the list
-                skeleton_slice_list.append(skeleton_slice)
-
-
-            # Stack the list of skeleton slices back into an ndarray, maintaining the original shape
-            skeleton_ms = np.stack(skeleton_slice_list, axis=direction)
-
-
-            plotting=False
-            if plotting:
-                plot_slices(data=ms_phase_of_interest,direction=direction,block=False)
-                plot_slices(data=skeleton_ms,direction=direction)
+                if plotting:
+                    plt.matshow(skeleton_ms)
+                    plt.show()
 
 
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
@@ -344,9 +351,9 @@ if __name__=="__main__":
 
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
-    ms = np.load(minimal_example_ms)
+    # ms = np.load(minimal_example_ms)
 
-    ms = ms[:,:,-2:-1]
+    # ms = ms[:,:,-2:-1]
 
     #ms = np.fliplr(ms)
 
@@ -367,11 +374,11 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
-    # ms = np.ones((3,3,3))
-    # ms[0,0,0] = 0
-    # ms[1,1,1] = 0
-    # ms[2,2,2] = 0
-    # ms = ms.astype(int)
+    ms = np.ones((5,5,5))
+    ms[0,0,0] = 0
+    ms[1,1,1] = 0
+    ms[2,2,2] = 0
+    ms = ms.astype(int)
 
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
