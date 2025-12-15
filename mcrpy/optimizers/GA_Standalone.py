@@ -101,25 +101,25 @@ class DiverseRandomSampling(Sampling):
         other_directions = [other_direction for other_direction in (0,1,2) if other_direction!= direction]
         
         if dim == 2:
-            nx, ny = ms.shape
+            ny, nx = ms.shape
             other_direction = other_directions[0]
             rand_int = np.random.randint(0, ms.shape[other_direction])
-            if direction == 0:  # x-direction: left to right
-                ms[:,rand_int] = phase
-            elif direction == 1:  # y-direction: top to bottom
-                 ms[rand_int,:] = phase
+            if direction == 0:  # x-direction: set full row to connect left to right
+                ms[rand_int, :] = phase
+            elif direction == 1:  # y-direction: set full column to connect top to bottom
+                ms[:, rand_int] = phase
         elif dim == 3:
-            nx, ny, nz = ms.shape
+            nz, ny, nx = ms.shape
             other_direction1 = other_directions[0]
             other_direction2 = other_directions[1]
-            rand_int1 = np.random.randint(0, other_direction1)
-            rand_int2 = np.random.randint(0, other_direction2)
-            if direction == 0:  # x-direction: left to right
-               ms[:,rand_int1,rand_int2] = phase
-            elif direction == 1:  # y-direction: top to bottom
-               ms[rand_int1,:,rand_int2] = phase
-            elif direction == 2:  # z-direction: front to back
-               ms[rand_int1,rand_int2,:] = phase
+            rand_int1 = np.random.randint(0, ms.shape[other_direction1])
+            rand_int2 = np.random.randint(0, ms.shape[other_direction2])
+            if direction == 0:  # x-direction: set full row in random depth to connect left to right
+                ms[rand_int1, rand_int2, :] = phase
+            elif direction == 1:  # y-direction: set full column in random depth to connect top to bottom
+                ms[rand_int1, :, rand_int2] = phase
+            elif direction == 2:  # z-direction: set full depth in random row/col to connect front to back
+                ms[:, rand_int1, rand_int2] = phase
 
 
 class PhaseBitflip(Mutation):
@@ -425,7 +425,7 @@ if __name__ == "__main__":
     result_2d = run_ga_optimization(
         ms_shape=(100, 100),
         n_phases=3,
-        target_tortuosity=1,
+        target_tortuosity=1.5,
         max_generations=200,
         pop_size=150,
         phase_of_interest=0, 
