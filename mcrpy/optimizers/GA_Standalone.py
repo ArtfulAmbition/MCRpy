@@ -69,13 +69,12 @@ class DiverseRandomSampling(Sampling):
     to provide a better starting point for tortuosity optimization.
     """
     
-    def _do(self, problem, n_samples, **kwargs):
+    def _do(self, problem, n_samples, start_with_connected_path=True, **kwargs):
         """Generate diverse initial population with mixed phases.
         Optionally ensures connectivity for phase_of_interest.
         """
         n_phases = int(problem.xu[0]) + 1
         
-        start_with_connected_path = False
         if start_with_connected_path:
             X = np.zeros((n_samples, problem.n_var), dtype=int)
             
@@ -87,10 +86,7 @@ class DiverseRandomSampling(Sampling):
             for i in range(n_samples):
                 # Generate random microstructure
                 init_ms = np.random.randint(0, n_phases, ms_shape).astype(int)
-                
-                # If phase_of_interest is valid and present, create a connected path
-                if 0 <= phase_of_interest < n_phases:
-                    self._add_connected_path(init_ms, phase_of_interest, direction, dimensionality)
+                self._add_connected_path(init_ms, phase_of_interest, direction, dimensionality)
                 
                 X[i] = init_ms.flatten()
             
@@ -427,12 +423,12 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(7, 7),
+        ms_shape=(100, 100),
         n_phases=3,
-        target_tortuosity=3,
+        target_tortuosity=1,
         max_generations=200,
         pop_size=150,
-        phase_of_interest=2, 
+        phase_of_interest=0, 
         connectivity='sides',
         method='DSPSM',
         direction=1,
