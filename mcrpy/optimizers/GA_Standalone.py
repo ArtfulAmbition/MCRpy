@@ -69,7 +69,7 @@ class DiverseRandomSampling(Sampling):
     to provide a better starting point for tortuosity optimization.
     """
     
-    def _do(self, problem, n_samples, start_with_connected_path=True, **kwargs):
+    def _do(self, problem, n_samples, start_with_connected_path=False, **kwargs):
         """Generate diverse initial population with mixed phases.
         Optionally ensures connectivity for phase_of_interest.
         """
@@ -423,16 +423,16 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(100, 100),
-        n_phases=3,
-        target_tortuosity=1.5,
-        max_generations=200,
-        pop_size=150,
+        ms_shape=(5, 5),
+        n_phases=2,
+        target_tortuosity=5,
+        max_generations=100,
+        pop_size=500,
         phase_of_interest=0, 
-        connectivity='sides',
-        method='DSPSM',
-        direction=1,
-        stop_loss_tol = 1e-4,
+        connectivity='corners',
+        method='SSPSM',
+        direction=0,
+        stop_loss_tol = 1e-2,
         #seed=42,
         verbose=True
     )

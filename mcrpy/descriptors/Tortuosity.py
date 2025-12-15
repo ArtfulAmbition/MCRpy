@@ -21,7 +21,7 @@ from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from numpy.typing import NDArray
 from typing import Any, Union
 import numpy as np
-from skimage.morphology import medial_axis
+from skimage.morphology import medial_axis, skeletonize
 from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_labeled_ms
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
@@ -218,43 +218,45 @@ class Tortuosity(PhaseDescriptor):
             logging.info(f"DSPSM: Tortuosity = {tortuosity:.4f} (mean path length: {mean_path_length:.2f})")
             return tortuosity
         
-        def SSPSM(ms_phase_of_interest: NDArray[np.bool_]):
+        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], plotting:bool=False, method='skeletonize'):
             '''
             Skeleton Shortest Path Searching Method
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
+
+            if method == 'medial_axis':
+                dimensionality = len(ms_phase_of_interest.shape)
+                if dimensionality == 3 and not any(dim == 1 for dim in ms_phase_of_interest.shape):
+                    total_number_slices = ms_phase_of_interest.shape[direction]
+                    skeleton_slice_list = []
+                    for slice_number in range(total_number_slices):
+                        # Get the slice from the original ndarray
+                        ms_slice = slice_ndarray(data=ms_phase_of_interest,axis=direction,index=slice_number)
+
+                        # Apply medial_axis to the sliced data
+                        skeleton_slice = medial_axis(ms_slice)
+
+                        # Append the resulting skeleton slice to the list
+                        skeleton_slice_list.append(skeleton_slice)
+
+
+                    # Stack the list of skeleton slices back into an ndarray, maintaining the original shape
+                    skeleton_ms = np.stack(skeleton_slice_list, axis=direction)
+
+                    if plotting:
+                        plot_slices(data=ms_phase_of_interest,direction=direction,block=False)
+                        plot_slices(data=skeleton_ms,direction=direction)
+                else:
+                    skeleton_ms = medial_axis(ms_phase_of_interest)
+
+                    if plotting:
+                        plt.matshow(skeleton_ms)
+                        plt.show()
             
-            plotting=True
-
-            dimensionality = len(ms_phase_of_interest.shape)
-            if dimensionality == 3 and not any(dim == 1 for dim in ms_phase_of_interest.shape):
-                total_number_slices = ms_phase_of_interest.shape[direction]
-                skeleton_slice_list = []
-                for slice_number in range(total_number_slices):
-                    # Get the slice from the original ndarray
-                    ms_slice = slice_ndarray(data=ms_phase_of_interest,axis=direction,index=slice_number)
-
-                    # Apply medial_axis to the sliced data
-                    skeleton_slice = medial_axis(ms_slice)
-
-                    # Append the resulting skeleton slice to the list
-                    skeleton_slice_list.append(skeleton_slice)
-
-
-                # Stack the list of skeleton slices back into an ndarray, maintaining the original shape
-                skeleton_ms = np.stack(skeleton_slice_list, axis=direction)
-
-                if plotting:
-                    plot_slices(data=ms_phase_of_interest,direction=direction,block=False)
-                    plot_slices(data=skeleton_ms,direction=direction)
+            elif method == 'skeletonize':
+                skeleton_ms = skeletonize(ms_phase_of_interest)
             else:
-                
-                skeleton_ms = medial_axis(ms_phase_of_interest)
-
-                if plotting:
-                    plt.matshow(skeleton_ms)
-                    plt.show()
-
+                raise NotImplementedError('Error: Method {method} not implemented in SSPSM.')
 
             return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
 
