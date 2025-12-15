@@ -96,7 +96,7 @@ class DiverseRandomSampling(Sampling):
             
             return X
         else:
-            X = np.random.randint(0,n_phases-1,size=(n_samples, problem.n_var), dtype=int)
+            X = np.random.randint(0,n_phases,size=(n_samples, problem.n_var), dtype=int)
             return X
     
     def _add_connected_path(self, ms, phase, direction, dim):
@@ -427,15 +427,15 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(20, 20),
-        n_phases=5,
+        ms_shape=(7, 7),
+        n_phases=3,
         target_tortuosity=3,
         max_generations=200,
         pop_size=150,
-        phase_of_interest=0, 
+        phase_of_interest=2, 
         connectivity='sides',
         method='DSPSM',
-        direction=0,
+        direction=1,
         stop_loss_tol = 1e-4,
         #seed=42,
         verbose=True
