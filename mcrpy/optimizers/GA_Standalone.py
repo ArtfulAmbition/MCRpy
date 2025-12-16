@@ -468,7 +468,7 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(70, 70, 70),
+        ms_shape=(5, 5, 5),
         n_phases=2,
         target_tortuosity=5,
         max_generations=5,
