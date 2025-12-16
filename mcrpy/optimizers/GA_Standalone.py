@@ -45,10 +45,6 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 mpi_size = MPI.COMM_WORLD.Get_size()
 
-print(f'rank: {rank}')
-
-comm.Barrier()
-
 def mpi_logging(message:str='', mode:str='default', end:str='\n'):
     #assert isinstance(message,str)
     if rank==0:
@@ -63,8 +59,6 @@ def mpi_logging(message:str='', mode:str='default', end:str='\n'):
             print(message,end=end)
         else:
             raise TypeError(f'mode {mode} not implemented.')
-
-
 
 class DiverseRandomSampling(Sampling):
     """Custom sampling to ensure phase diversity in initial population.
@@ -105,7 +99,6 @@ class DiverseRandomSampling(Sampling):
         else:
             X_to_broadcast = None
         X = comm.bcast(X_to_broadcast, root=0)
-        print(f'rank {rank}: X=\n{X}')
         return X
     
     def _add_connected_path(self, ms, phase, direction, dim):
@@ -133,7 +126,6 @@ class DiverseRandomSampling(Sampling):
                 ms[rand_int1, :, rand_int2] = phase
             elif direction == 2:  # z-direction: set full depth in random row/col to connect front to back
                 ms[:, rand_int1, rand_int2] = phase
-
 
 class PhaseBitflip(Mutation):
     """Safe bit-flip style mutation for integer phase variables.
@@ -220,9 +212,12 @@ class MicrostructureOptimizationProblem(Problem):
     def _evaluate(self, x, out, *args, **kwargs):
         """Evaluate fitness for population x using MPI parallelization."""
            
+        # print(f'rank {rank}: x in evaluate:\n {x}')
+
         # Split the population across MPI ranks
         chunks = np.array_split(x, mpi_size)
         local_chunk = chunks[rank]
+        # print(f'rank {rank}: local_chunk:\n {local_chunk}')
         
         local_fitness = np.zeros(len(local_chunk))
         for i, individual in enumerate(local_chunk):
@@ -399,6 +394,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         mpi_logging(f"Final loss: {best_loss:.6f}")
         mpi_logging(f"Target tortuosity: {target_tortuosity:.6f}")
         mpi_logging(f"Optimized tortuosity: {final_tort:.6f}")
+        mpi_logging(f'direction {direction}, phase {phase_of_interest}')
         mpi_logging(f"Tortuosity error: {np.abs(final_tort - target_tortuosity):.6f}")
         mpi_logging(f"Generations: {res.algorithm.n_gen}")
         mpi_logging(f"Total evaluations: {total_eval_count}")
@@ -441,7 +437,7 @@ if __name__ == "__main__":
         force=True  # Override any previous basicConfig
     )
     logging.info("="*60)
-    mpi_logging(f'TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION rank {rank}')
+    mpi_logging(f'TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION')
     logging.info("="*60)
     # Suppress Matplotlib logging
     #logging.getLogger('matplotlib').setLevel(logging.WARNING)
@@ -472,17 +468,17 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(5, 5),
+        ms_shape=(70, 70, 70),
         n_phases=2,
         target_tortuosity=5,
         max_generations=5,
-        pop_size=4,
+        pop_size=20,
         phase_of_interest=0, 
-        connectivity='sides',
-        method='DSPSM',
+        connectivity='corners',
+        method='SSPSM',
         direction=0,
         stop_loss_tol = 1e-2,
-        #seed=42,
+        seed=np.random.randint(1, 1000),
         verbose=True
     )
 
