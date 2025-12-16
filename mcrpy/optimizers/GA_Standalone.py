@@ -77,27 +77,36 @@ class DiverseRandomSampling(Sampling):
         """Generate diverse initial population with mixed phases.
         Optionally ensures connectivity for phase_of_interest.
         """
-        n_phases = int(problem.xu[0]) + 1
-        
-        if start_with_connected_path:
-            X = np.zeros((n_samples, problem.n_var), dtype=int)
+        def calculate_X():
+            n_phases = int(problem.xu[0]) + 1
             
-            ms_shape = problem.ms_shape
-            dimensionality = len(ms_shape)
-            phase_of_interest = getattr(problem, 'phase_of_interest', 0)
-            direction = getattr(problem, 'direction', 0)
-            
-            for i in range(n_samples):
-                # Generate random microstructure
-                init_ms = np.random.randint(0, n_phases, ms_shape).astype(int)
-                self._add_connected_path(init_ms, phase_of_interest, direction, dimensionality)
+            if start_with_connected_path:
+                X = np.zeros((n_samples, problem.n_var), dtype=int)
                 
-                X[i] = init_ms.flatten()
-            
+                ms_shape = problem.ms_shape
+                dimensionality = len(ms_shape)
+                phase_of_interest = getattr(problem, 'phase_of_interest', 0)
+                direction = getattr(problem, 'direction', 0)
+                
+                for i in range(n_samples):
+                    # Generate random microstructure
+                    init_ms = np.random.randint(0, n_phases, ms_shape).astype(int)
+                    self._add_connected_path(init_ms, phase_of_interest, direction, dimensionality)
+                    
+                    X[i] = init_ms.flatten()
+                
+                return X
+            else:
+                X = np.random.randint(0,n_phases,size=(n_samples, problem.n_var), dtype=int)
             return X
+        
+        if comm.rank==0:
+            X_to_broadcast = calculate_X()
         else:
-            X = np.random.randint(0,n_phases,size=(n_samples, problem.n_var), dtype=int)
-            return X
+            X_to_broadcast = None
+        X = comm.bcast(X_to_broadcast, root=0)
+        print(f'rank {rank}: X=\n{X}')
+        return X
     
     def _add_connected_path(self, ms, phase, direction, dim):
         """Add a connected path for the given phase along the specified direction."""
@@ -415,11 +424,11 @@ if __name__ == "__main__":
     
 # Configure logging for standalone execution
     import os
-    pid = os.getpid()
-    print("pid: ",pid,flush=True)
-    if comm.rank == 0:
-        input("Enter")
-    comm.Barrier()
+    # pid = os.getpid()
+    # print("pid: ",pid,flush=True)
+    # if comm.rank == 0:
+    #     input("Enter")
+    # comm.Barrier()
     #exit()
     log_dir = './GA_Standalone_logs'
     os.makedirs(log_dir, exist_ok=True)
@@ -467,7 +476,7 @@ if __name__ == "__main__":
         n_phases=2,
         target_tortuosity=5,
         max_generations=5,
-        pop_size=20,
+        pop_size=4,
         phase_of_interest=0, 
         connectivity='sides',
         method='DSPSM',
