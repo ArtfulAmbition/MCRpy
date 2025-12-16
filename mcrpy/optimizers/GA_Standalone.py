@@ -232,10 +232,10 @@ class MicrostructureOptimizationProblem(Problem):
             self.eval_count += 1
         
         # Gather fitness from all ranks
-        print(f'process rank {rank} evalutated local fitness {local_fitness}.')
+        #print(f'process rank {rank} evalutated local fitness {local_fitness}.')
         all_fitness = comm.allgather(local_fitness)
         fitness = np.concatenate(all_fitness)
-        mpi_logging(f'process rank {rank} evalutated total fitness {fitness}.')
+        #mpi_logging(f'process rank {rank} evalutated total fitness {fitness}.')
         
         out["F"] = fitness
 
@@ -380,6 +380,8 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         voxel_dimension=voxel_dimension
     )
     final_tort = float(descriptor(optimized_ms))
+
+    total_eval_count = comm.reduce(problem.eval_count, op=MPI.SUM, root=0)
     
     if verbose:
         mpi_logging("\n" + "="*70)
@@ -390,7 +392,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
         mpi_logging(f"Optimized tortuosity: {final_tort:.6f}")
         mpi_logging(f"Tortuosity error: {np.abs(final_tort - target_tortuosity):.6f}")
         mpi_logging(f"Generations: {res.algorithm.n_gen}")
-        mpi_logging(f"Total evaluations: {problem.eval_count}")
+        mpi_logging(f"Total evaluations: {total_eval_count}")
         mpi_logging("="*70)
         mpi_logging("\nOptimized microstructure:")
         mpi_logging(optimized_ms)
@@ -458,7 +460,7 @@ if __name__ == "__main__":
         ms_shape=(5, 5),
         n_phases=2,
         target_tortuosity=5,
-        max_generations=20,
+        max_generations=5,
         pop_size=20,
         phase_of_interest=0, 
         connectivity='sides',
