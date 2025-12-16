@@ -46,9 +46,10 @@ rank = comm.Get_rank()
 mpi_size = MPI.COMM_WORLD.Get_size()
 
 print(f'rank: {rank}')
+
 comm.Barrier()
 
-def mpi_logging(message:str='', mode:str='print', end:str='\n'):
+def mpi_logging(message:str='', mode:str='default', end:str='\n'):
     #assert isinstance(message,str)
     if rank==0:
         if mode.lower() == 'debug':
@@ -56,6 +57,9 @@ def mpi_logging(message:str='', mode:str='print', end:str='\n'):
         elif mode.lower() == 'info':
             logging.info(message)
         elif mode.lower() == 'print':
+            print(message,end=end)
+        elif mode.lower() == 'default':
+            logging.info(message)
             print(message,end=end)
         else:
             raise TypeError(f'mode {mode} not implemented.')
@@ -205,24 +209,51 @@ class MicrostructureOptimizationProblem(Problem):
         )
     
     def _evaluate(self, x, out, *args, **kwargs):
-        """Evaluate fitness for population x. 
-        The population x consists of individuals (= microstructures)"""
-        fitness = np.zeros(len(x)) # initialize fitness
-        
-        for i, individual in enumerate(x):
-            # Reshape to microstructure
-            ms = individual.reshape(self.ms_shape).astype(int)
+        """Evaluate fitness for population x using MPI parallelization."""
+        if mpi_size > 1:
             
-            # Compute tortuosity using MCRpy descriptor
-            try:
-                current_tort = float(self.descriptor(ms))
-            except Exception as e:
-                raise Exception('error in evaluation of tortuosity')
+            # Split the population across MPI ranks
+            chunks = np.array_split(x, mpi_size)
+            local_chunk = chunks[rank]
             
-            # Loss: absolute difference from target
-            loss = np.abs(current_tort - self.target_tortuosity)
-            fitness[i] = loss
-            self.eval_count += 1
+            local_fitness = np.zeros(len(local_chunk))
+            for i, individual in enumerate(local_chunk):
+                # Reshape to microstructure
+                ms = individual.reshape(self.ms_shape).astype(int)
+                
+                # Compute tortuosity using MCRpy descriptor
+                try:
+                    current_tort = float(self.descriptor(ms))
+                except Exception as e:
+                    raise Exception('error in evaluation of tortuosity')
+                
+                # Loss: absolute difference from target
+                loss = np.abs(current_tort - self.target_tortuosity)
+                local_fitness[i] = loss
+                self.eval_count += 1
+            
+            # Gather fitness from all ranks
+            # print(f'process rank {rank} evalutated local fitness {local_fitness}.')
+            all_fitness = comm.allgather(local_fitness)
+            fitness = np.concatenate(all_fitness)
+            # mpi_logging(f'process rank {rank} evalutated total fitness {fitness}.')
+        else:
+            # Sequential evaluation for single rank
+            fitness = np.zeros(len(x))
+            for i, individual in enumerate(x):
+                # Reshape to microstructure
+                ms = individual.reshape(self.ms_shape).astype(int)
+                
+                # Compute tortuosity using MCRpy descriptor
+                try:
+                    current_tort = float(self.descriptor(ms))
+                except Exception as e:
+                    raise Exception('error in evaluation of tortuosity')
+                
+                # Loss: absolute difference from target
+                loss = np.abs(current_tort - self.target_tortuosity)
+                fitness[i] = loss
+                self.eval_count += 1
         
         out["F"] = fitness
 
@@ -398,6 +429,25 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
 
 if __name__ == "__main__":
     
+# Configure logging for standalone execution
+    import os
+    log_dir = './GA_Standalone_logs'
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, 'GA_Standalone.log')
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        force=True  # Override any previous basicConfig
+    )
+    logging.info("="*60)
+    mpi_logging(f'TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION rank {rank}')
+    logging.info("="*60)
+    # Suppress Matplotlib logging
+    #logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
+
     # # Example 1: Simple 2D microstructure - find phase 1 with target tortuosity
     # mpi_logging("\n" + "#"*70)
     # mpi_logging("# EXAMPLE 1: 2D (7x7), 2 phases, optimize PHASE 1, target tort=1.2")
@@ -418,7 +468,7 @@ if __name__ == "__main__":
 
     # Example: 2D microstructure with target tortuosity 2.5
     # Achievable pattern: alternating phase 0 stripes (as shown in your 4x4 example)
-    mpi_logging("\n" + "#"*70)
+    mpi_logging("#"*70)
     mpi_logging("# EXAMPLE: 2D (7x7), 2 phases, optimize PHASE 0, target tort=2.5")
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
@@ -426,11 +476,11 @@ if __name__ == "__main__":
         ms_shape=(5, 5),
         n_phases=2,
         target_tortuosity=5,
-        max_generations=100,
-        pop_size=500,
+        max_generations=20,
+        pop_size=20,
         phase_of_interest=0, 
-        connectivity='corners',
-        method='SSPSM',
+        connectivity='sides',
+        method='DSPSM',
         direction=0,
         stop_loss_tol = 1e-2,
         #seed=42,
