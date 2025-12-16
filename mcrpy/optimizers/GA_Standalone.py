@@ -210,50 +210,32 @@ class MicrostructureOptimizationProblem(Problem):
     
     def _evaluate(self, x, out, *args, **kwargs):
         """Evaluate fitness for population x using MPI parallelization."""
-        if mpi_size > 1:
+           
+        # Split the population across MPI ranks
+        chunks = np.array_split(x, mpi_size)
+        local_chunk = chunks[rank]
+        
+        local_fitness = np.zeros(len(local_chunk))
+        for i, individual in enumerate(local_chunk):
+            # Reshape to microstructure
+            ms = individual.reshape(self.ms_shape).astype(int)
             
-            # Split the population across MPI ranks
-            chunks = np.array_split(x, mpi_size)
-            local_chunk = chunks[rank]
+            # Compute tortuosity using MCRpy descriptor
+            try:
+                current_tort = float(self.descriptor(ms))
+            except Exception as e:
+                raise Exception('error in evaluation of tortuosity')
             
-            local_fitness = np.zeros(len(local_chunk))
-            for i, individual in enumerate(local_chunk):
-                # Reshape to microstructure
-                ms = individual.reshape(self.ms_shape).astype(int)
-                
-                # Compute tortuosity using MCRpy descriptor
-                try:
-                    current_tort = float(self.descriptor(ms))
-                except Exception as e:
-                    raise Exception('error in evaluation of tortuosity')
-                
-                # Loss: absolute difference from target
-                loss = np.abs(current_tort - self.target_tortuosity)
-                local_fitness[i] = loss
-                self.eval_count += 1
-            
-            # Gather fitness from all ranks
-            # print(f'process rank {rank} evalutated local fitness {local_fitness}.')
-            all_fitness = comm.allgather(local_fitness)
-            fitness = np.concatenate(all_fitness)
-            # mpi_logging(f'process rank {rank} evalutated total fitness {fitness}.')
-        else:
-            # Sequential evaluation for single rank
-            fitness = np.zeros(len(x))
-            for i, individual in enumerate(x):
-                # Reshape to microstructure
-                ms = individual.reshape(self.ms_shape).astype(int)
-                
-                # Compute tortuosity using MCRpy descriptor
-                try:
-                    current_tort = float(self.descriptor(ms))
-                except Exception as e:
-                    raise Exception('error in evaluation of tortuosity')
-                
-                # Loss: absolute difference from target
-                loss = np.abs(current_tort - self.target_tortuosity)
-                fitness[i] = loss
-                self.eval_count += 1
+            # Loss: absolute difference from target
+            loss = np.abs(current_tort - self.target_tortuosity)
+            local_fitness[i] = loss
+            self.eval_count += 1
+        
+        # Gather fitness from all ranks
+        print(f'process rank {rank} evalutated local fitness {local_fitness}.')
+        all_fitness = comm.allgather(local_fitness)
+        fitness = np.concatenate(all_fitness)
+        mpi_logging(f'process rank {rank} evalutated total fitness {fitness}.')
         
         out["F"] = fitness
 
