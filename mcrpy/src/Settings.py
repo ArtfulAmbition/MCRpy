@@ -59,6 +59,7 @@ class OptimizerSettings:
     cooldown_factor: float = 0.9
     mutation_rule: str = 'relaxed_neighbor'
     acceptance_distribution: str = 'zero_tolerance'
+    population_size: int = 50
 
 @dataclass
 class LossSettings:

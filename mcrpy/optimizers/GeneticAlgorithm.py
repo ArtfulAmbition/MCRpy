@@ -186,7 +186,7 @@ class GeneticAlgorithm(Optimizer):
     """
     
     is_gradient_based = False
-    is_vf_based = True
+    is_vf_based = False
     is_sparse = False
     swaps_pixels = True
     
@@ -279,7 +279,7 @@ class GeneticAlgorithm(Optimizer):
             msg += f" (MPI enabled: {self.mpi_size} ranks)"
         mpi_logging(msg,rank=self.rank)
         
-    def optimize(self, ms):
+    def optimize(self, ms, restart_from_niter: int = None):
         """
         Run genetic algorithm optimization.
         
@@ -365,7 +365,7 @@ class GeneticAlgorithm(Optimizer):
         mpi_logging(f"GA optimization completed after {problem.eval_count} evaluations",rank=self.rank)
         mpi_logging(f"Final loss: {best_loss:.6f}",rank=self.rank)
         
-        return res
+        return res.algorithm.n_gen
     
     def _evaluate_with_logging(self, ms_array):
         """Evaluate microstructure with logging."""

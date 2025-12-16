@@ -207,6 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('--acceptance_distribution', type=str, help='Acceptance distribution for YT', default='zero_tolerance')
     parser.add_argument('--symmetry', type=str, help='Symmetry of the microstructure if orientations are considered. Default is None.', default=None)
     parser.add_argument('--max_iter', type=int, help='Maximum number of iterations.', default=500)
+    parser.add_argument('--population_size', type=int, help='Population size for genetic algorithm.', default=50)
     parser.add_argument('--convergence_data_steps', type=int, help='Each x steps write data', default=10)
     parser.add_argument('--outfile_data_steps', type=int, help='Each x steps write data to disk', default=None)
     parser.add_argument('--tolerance', type=float, help='Resonctruction tolerance.', default=1e-10)
