@@ -415,6 +415,12 @@ if __name__ == "__main__":
     
 # Configure logging for standalone execution
     import os
+    pid = os.getpid()
+    print("pid: ",pid,flush=True)
+    if comm.rank == 0:
+        input("Enter")
+    comm.Barrier()
+    #exit()
     log_dir = './GA_Standalone_logs'
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, 'GA_Standalone.log')
