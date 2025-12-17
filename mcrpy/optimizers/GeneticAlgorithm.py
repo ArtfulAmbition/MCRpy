@@ -14,6 +14,16 @@
    limitations under the License.
 """
 
+disable_tf_warnings = True
+if disable_tf_warnings:
+    # Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
+    # - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
+    #   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
+    # - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
+    import os
+    os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+    os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
+
 import logging
 import numpy as np
 import tensorflow as tf
@@ -31,7 +41,7 @@ from pymoo.optimize import minimize
 from pymoo.termination.default import DefaultMultiObjectiveTermination
 from mpi4py import MPI
 from mcrpy.src.log import mpi_logging
-        
+
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
     
@@ -443,7 +453,6 @@ def register() -> None:
 if __name__ == "__main__":
     import numpy as np
     from mcrpy.src.MutableMicrostructure import MutableMicrostructure
-    import os
     from mcrpy.descriptors.Tortuosity import Tortuosity
 
     logging.basicConfig(level=logging.INFO, format='%(message)s')
