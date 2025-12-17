@@ -75,3 +75,28 @@ def log_this(function):
     return wrapper
 
 
+def mpi_logging(message:str='', mode:str='tee', end:str='\n'):
+    ''' logger function to print messages to the terminal or log file. 
+    With a provided MPI comm object comm = MPI.COMM_WORLD, the logging / printing is
+     performed only for rank 0'''
+
+    try:
+        from mpi4py import MPI
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+    except:
+        rank = 0
+
+    if rank == 0:
+        if mode.lower() == 'debug':
+            logging.debug(message)
+        elif mode.lower() == 'info':
+            logging.info(message)
+        elif mode.lower() == 'print':
+            print(message,end=end)
+        elif mode.lower() == 'tee':
+            logging.info(message)
+            print(message,end=end)
+        else:
+            raise TypeError(f'mode {mode} not implemented.')
+

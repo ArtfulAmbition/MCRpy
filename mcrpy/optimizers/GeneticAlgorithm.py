@@ -22,37 +22,15 @@ from mcrpy.optimizers.Optimizer import Optimizer
 from mcrpy.src import optimizer_factory
 from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 
-try:
-    from pymoo.algorithms.soo.nonconvex.ga import GA
-    from pymoo.core.problem import Problem
-    from pymoo.operators.crossover.sbx import SBX
-    from pymoo.operators.mutation.pm import PM
-    from pymoo.operators.sampling.rnd import FloatRandomSampling
-    from pymoo.optimize import minimize
-    from pymoo.termination.default import DefaultMultiObjectiveTermination
-    HAS_PYMOO = True
-except ImportError:
-    HAS_PYMOO = False
-    logging.warning("pymoo not installed. Install with: pip install pymoo")
-
-try:
-    from mpi4py import MPI
-    HAS_MPI = True
-except ImportError:
-    HAS_MPI = False
-    logging.debug("mpi4py not installed. GA will run serially. Install with: pip install mpi4py")
-
-def mpi_logging(message:str, rank:int=0, mode:str='info'):
-    assert isinstance(message,str)
-    if rank==0:
-        if mode.lower() == 'debug':
-            logging.debug(message)
-        elif mode.lower() == 'info':
-            logging.info(message)
-        elif mode.lower() == 'print':
-            print(message)
-        else:
-            raise TypeError(f'mode {mode} not implemented.')
+from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.core.problem import Problem
+from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
+from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.optimize import minimize
+from pymoo.termination.default import DefaultMultiObjectiveTermination
+from mpi4py import MPI
+from mcrpy.src.log import mpi_logging
         
 class MicrostructureReconstructionProblem(Problem):
     """Pymoo Problem Definition for Microstructure Reconstruction."""
@@ -72,7 +50,7 @@ class MicrostructureReconstructionProblem(Problem):
         self.is_3D = is_3D
         self.eval_count = 0
         self.n_phases = n_phases
-        self.use_mpi = use_mpi and HAS_MPI
+        self.use_mpi = use_mpi
         
         if self.use_mpi:
             self.comm = MPI.COMM_WORLD
@@ -225,10 +203,7 @@ class GeneticAlgorithm(Optimizer):
             target_loss: Target loss to stop optimization (default: 1e-5, set to 0 to disable)
             use_mpi: Whether to use MPI parallelization for population evaluation
         """
-        
-        if not HAS_PYMOO:
-            raise ImportError("pymoo is required for GeneticAlgorithm. Install with: pip install pymoo")
-        
+               
         if use_orientations:
             raise ValueError('GeneticAlgorithm cannot solve for orientations.')
         
@@ -237,7 +212,7 @@ class GeneticAlgorithm(Optimizer):
         self.conv_iter = conv_iter
         self.reconstruction_callback = callback
         self.target_loss = target_loss
-        self.use_mpi = use_mpi and HAS_MPI
+        self.use_mpi = use_mpi
         
         if self.use_mpi:
             self.comm = MPI.COMM_WORLD
@@ -275,7 +250,7 @@ class GeneticAlgorithm(Optimizer):
         msg = f"GeneticAlgorithm initialized with population_size={population_size}, max_iter={max_iter}"
         if self.use_mpi:
             msg += f" (MPI enabled: {self.mpi_size} ranks)"
-        mpi_logging(msg,rank=self.rank)
+        mpi_logging(msg)
         
     def optimize(self, ms, restart_from_niter: int = None):
         """
@@ -286,7 +261,7 @@ class GeneticAlgorithm(Optimizer):
             restart_from_niter: Iteration to restart from (if applicable)
         """
         
-        mpi_logging(f"Starting GA optimization for microstructure shape {ms.xx.shape}",rank=self.rank)
+        mpi_logging(f"Starting GA optimization for microstructure shape {ms.xx.shape}")
         
         # Get microstructure as binary array
         ms_array = ms.xx.numpy() if isinstance(ms.xx, tf.Tensor) else np.array(ms.xx)
@@ -314,7 +289,7 @@ class GeneticAlgorithm(Optimizer):
         )
         
         # Run optimization
-        mpi_logging(f"Starting optimization: {self.population_size} individuals, max {self.max_iter} generations",rank=self.rank)
+        mpi_logging(f"Starting optimization: {self.population_size} individuals, max {self.max_iter} generations")
         
         res = minimize(
             problem,
@@ -340,7 +315,7 @@ class GeneticAlgorithm(Optimizer):
                 global_best_idx = np.argmin(all_losses)
                 global_best_loss = all_losses[global_best_idx]
                 global_best_solution = all_solutions[global_best_idx]
-                mpi_logging(f"Global best loss across {self.mpi_size} ranks (from rank {global_best_idx}): {global_best_loss:.6f}", rank=self.rank)
+                mpi_logging(f"Global best loss across {self.mpi_size} ranks (from rank {global_best_idx}): {global_best_loss:.6f}")
             else:
                 global_best_loss = None
                 global_best_solution = None
@@ -360,8 +335,8 @@ class GeneticAlgorithm(Optimizer):
         best_individual_reshaped = best_individual.astype(np.float64).reshape(ms.x.shape)
         ms.x.assign(tf.constant(best_individual_reshaped, dtype=tf.float64))
         
-        mpi_logging(f"GA optimization completed after {problem.eval_count} evaluations",rank=self.rank)
-        mpi_logging(f"Final loss: {best_loss:.6f}",rank=self.rank)
+        mpi_logging(f"GA optimization completed after {problem.eval_count} evaluations")
+        mpi_logging(f"Final loss: {best_loss:.6f}")
         
         return res.algorithm.n_gen
     
@@ -397,7 +372,7 @@ class GeneticAlgorithm(Optimizer):
                         val = self.call_loss(temp_ms)
                         return float(val)
                     except Exception as e:
-                        mpi_logging(f"[GA debug] call_loss wrapper failed: {e}",rank=self.rank)
+                        mpi_logging(f"[GA debug] call_loss wrapper failed: {e}")
                         pass
 
                 loss = float(self.loss(ms_array))
@@ -431,7 +406,7 @@ class GeneticAlgorithm(Optimizer):
                     if goal_tort is not None:
                         output += f" | Tortuosity: {tort_value:.6f} (target: {goal_tort:.6f})"
                 
-                mpi_logging(output, rank=self.rank)
+                mpi_logging(output)
         else:
             self.no_improve_count += 1
         
@@ -444,19 +419,19 @@ class GeneticAlgorithm(Optimizer):
         
         # Stop if target loss is achieved (only if target_loss > 0, else skip)
         if self.target_loss > 0 and best_fitness <= self.target_loss:
-            mpi_logging(f"Target loss of {self.target_loss} achieved.",rank=self.rank)
+            mpi_logging(f"Target loss of {self.target_loss} achieved.")
             algorithm.termination.force_termination = True
             return
         
         # Early stopping if no improvement
         if self.no_improve_count >= self.conv_iter:
-            mpi_logging(f"Early stopping: No improvement for {self.conv_iter} generations",rank=self.rank)
+            mpi_logging(f"Early stopping: No improvement for {self.conv_iter} generations")
             algorithm.termination.force_termination = True
         
         # Log progress
         if algorithm.n_gen % max(1, self.max_iter // 10) == 0:
             mpi_logging(f"Generation {algorithm.n_gen}/{self.max_iter}: "
-                         f"Best fitness = {best_fitness:.6f}",rank=self.rank)
+                         f"Best fitness = {best_fitness:.6f}")
 
 
 def register() -> None:
@@ -544,7 +519,7 @@ if __name__ == "__main__":
     
     # Create and run GA optimizer
     ga = GeneticAlgorithm(
-        max_iter=1000,
+        max_iter=300,
         population_size=150,
         loss=loss_function,
         is_3D=False,
@@ -575,7 +550,6 @@ if __name__ == "__main__":
         print(f'Initial loss: {loss_function(start_ms):.6f}')
         print(f'Final loss: {ga.current_loss:.6f}')
         print(f'Generations run: {len(ga.fitness_history)}')
-        print(f'Total evaluations: {result.problem.eval_count}')
         
         # Compute optimized tortuosity
         optimized_tort = singlephase_descriptor(optimized_ms_binary)
