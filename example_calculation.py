@@ -1,3 +1,18 @@
+import mcrpy
+
+# Define settings with both descriptor types
+settings = mcrpy.CharacterizationSettings(
+    descriptor_types=['Tortuosity', 'FFTCorrelations'],
+    limit_to=8
+)
+
+# Load microstructure
+ms = mcrpy.load('example_microstructures/BlockingLayer_X_2D_32x32.npy')
+
+# Characterize with both descriptors
+characterization = mcrpy.characterize(ms, settings)
+
+
 import os
 os.system("\
 ./mcrpy/characterize.py \

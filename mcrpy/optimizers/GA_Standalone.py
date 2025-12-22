@@ -468,17 +468,17 @@ if __name__ == "__main__":
     mpi_logging("# (Based on proven achievable pattern from 4x4)")
     mpi_logging("#"*70)
     result_2d = run_ga_optimization(
-        ms_shape=(5, 5, 5),
+        ms_shape=(10, 10),
         n_phases=2,
-        target_tortuosity=5,
-        max_generations=5,
-        pop_size=20,
+        target_tortuosity=2.05,
+        max_generations=20,
+        pop_size=500,
         phase_of_interest=0, 
-        connectivity='corners',
+        connectivity='sides',
         method='SSPSM',
         direction=0,
         stop_loss_tol = 1e-2,
-        seed=np.random.randint(1, 1000),
+        seed=42,#np.random.randint(1, 1000),
         verbose=True
     )
 
