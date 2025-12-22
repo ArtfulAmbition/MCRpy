@@ -20,20 +20,43 @@ from __future__ import annotations
 import tensorflow as tf
 
 from mcrpy.src import descriptor_factory
-from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
+from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
+from typing import Union
 
 
-class VolumeFractions3D(PhaseDescriptor3D):
+class VolumeFractions(PhaseDescriptor):
     is_differentiable = True
 
     @staticmethod
-    def make_singlephase_descriptor(**kwargs) -> callable:
+    def make_singlephase_descriptor(
+        phase_of_interest : Union[int,list[int]] = 0,
+        **kwargs) -> callable:
 
-        @tf.function
-        def compute_descriptor(microstructure) -> tf.Tensor:
-            return tf.math.reduce_mean(microstructure)
+        #@tf.function
+        def compute_descriptor(microstructure: tf.Tensor) -> tf.Tensor:
+            ms_phase_of_interest = ms == phase_of_interest
+            return np.mean(ms_phase_of_interest)
         return compute_descriptor
 
 
 def register() -> None:
-    descriptor_factory.register("VolumeFractions3D", VolumeFractions3D)
+    descriptor_factory.register("VolumeFractions", VolumeFractions)
+
+if __name__=="__main__":
+
+    import os
+    import numpy as np
+    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+    ms = np.load(minimal_example_ms)
+
+##------------------------------------------------------------------
+   
+    volume_fraction_descriptor = VolumeFractions()
+    singlephase_descriptor = volume_fraction_descriptor.make_singlephase_descriptor()
+
+    volume_fraction = singlephase_descriptor(ms)
+    print('\n -----------------------------')
+    print(f'Volume fraction value: {float(volume_fraction)}')
+
+##------------------------------------------------------------------

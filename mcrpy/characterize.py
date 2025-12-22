@@ -204,7 +204,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Characterize a microstructure given as numpy array')
     parser.add_argument('--microstructure_filenames', nargs='+', type=str, help='File or files of MS to characterize', default=['/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy'])
     parser.add_argument('--data_folder', type=str, help='Results folder. If None, default with timestamp.', default='results')
-    parser.add_argument('--descriptor_types', nargs='+', type=str, help='Descriptor types (list)', default=['Tortuosity'], choices=descriptor_choices)
+    parser.add_argument('--descriptor_types', nargs='+', type=str, help='Descriptor types (list)', default=['VolumeFractions3D'], choices=descriptor_choices)
     parser.add_argument('--nl_method', type=str, help='Nonlinearity method.', default='relu')
     parser.add_argument('--limit_to', type=int, help='Limit in pixels to which to limit the characterization metrics.', default=1)
     parser.add_argument('--threshold_steepness', type=float, help='Steepness of soft threshold function. Regularisation parameter.', default=10)
