@@ -40,7 +40,7 @@ class Tortuosity(PhaseDescriptor3D):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        direction : int = 0, #0:x, 1:y, 2:z
+        direction : int = 1, #0:x, 1:y, 2:z
         is_direction_reversed:bool = False, # The calculation of the Tortuosity is direction dependent. 
                                             # Set is_direction_reversed to True if the calculation should be from highest values in specofied direction to smallest values.
         phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
@@ -67,125 +67,131 @@ class Tortuosity(PhaseDescriptor3D):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             logging.info('Entering DSPSM function.')
  
-            # Use logging (reliable) instead of tf.print for logfile output
-            logging.warning(f'ms shape: {ms_phase_of_interest.shape}')
-
             # Quick exit if ms_phase_of_interest contains only False
             if not ms_phase_of_interest.any():
                 logging.debug("DSPSM: No phase voxels found, returning 0")
                 return np.float64(0)
 
-            # Build sparse adjacency between voxels of the phase using vectorized shifts
             shape = ms_phase_of_interest.shape
-            ndim = len(shape)
+            dimensionality = len(shape)
 
             # determine connectivity (in which direction are voxels considered as connected?)
-            connectivity_directions = get_connectivity_directions(ndim, connectivity=connectivity)
+            connectivity_directions = get_connectivity_directions(dimensionality, connectivity=connectivity)
             
-            #each position gets an scalar idx (=flat indices)
-            idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) 
+            def create_adjacency_sparse_matrix(ms_phase_of_interest: NDArray[np.bool_]):
+                shape = ms_phase_of_interest.shape
+                #each position gets a scalar idx (=flat indices)
+                idx_grid = np.arange(ms_phase_of_interest.size).reshape(shape) 
 
-            # coordinates where ms_phase_of_interest is True
-            node_coords = np.argwhere(ms_phase_of_interest)
-            
-            # Quick exit if no nodes are present
-            if node_coords.size == 0:
-                return np.float64(0) 
-            
-            # transforming node_coords into an 1D array using flat indices
-            node_flat = np.ravel_multi_index(node_coords.T, shape) 
-            
-            # mapping flat index -> compact index 
-            # The compact index is basically the graph nodal number, so from 0 to n-1 nodes
-            mapping = {int(flat): i for i, flat in enumerate(node_flat)}
+                # coordinates where ms_phase_of_interest is True
+                node_coords = np.argwhere(ms_phase_of_interest)
+                
+                # Quick exit if no nodes are present
+                if node_coords.size == 0:
+                    return np.float64(0) 
+                
+                # transforming node_coords into an 1D array using flat indices
+                node_flat = np.ravel_multi_index(node_coords.T, shape) 
+                
+                # mapping flat index -> compact index 
+                # The compact index is basically the graph nodal number, so from 0 to n-1 nodes
+                mapping = {int(flat): i for i, flat in enumerate(node_flat)}
 
-            # Initializing the lists needed to create the sparse matrix
-            rows = []
-            cols = []
-            data = []
+                # Initializing the lists needed to create the sparse matrix
+                rows = []
+                cols = []
+                data = []
 
-            # iterate over all connectivity offsets
-            for off in connectivity_directions:
-                off = tuple(int(x) for x in off) #making sure that all direction (= offset) tuples are of type int
-                # compute slices for source and target to avoid wrap-around
-                src_slices = []
-                tgt_slices = []
-                for dim_idx, o in enumerate(off):
-                    if o > 0:
-                        src_slices.append(slice(0, shape[dim_idx] - o))
-                        tgt_slices.append(slice(o, shape[dim_idx]))
-                    elif o < 0:
-                        src_slices.append(slice(-o, shape[dim_idx]))
-                        tgt_slices.append(slice(0, shape[dim_idx] + o))
-                    else:
-                        src_slices.append(slice(0, shape[dim_idx]))
-                        tgt_slices.append(slice(0, shape[dim_idx]))
-                src_slices = tuple(src_slices)
-                tgt_slices = tuple(tgt_slices)
+                # iterate over all connectivity offsets
+                for off in connectivity_directions:
+                    off = tuple(int(x) for x in off) #making sure that all direction (= offset) tuples are of type int
+                    # compute slices for source and target to avoid wrap-around
+                    src_slices = []
+                    tgt_slices = []
+                    for dim_idx, o in enumerate(off):
+                        if o > 0:
+                            src_slices.append(slice(0, shape[dim_idx] - o))
+                            tgt_slices.append(slice(o, shape[dim_idx]))
+                        elif o < 0:
+                            src_slices.append(slice(-o, shape[dim_idx]))
+                            tgt_slices.append(slice(0, shape[dim_idx] + o))
+                        else:
+                            src_slices.append(slice(0, shape[dim_idx]))
+                            tgt_slices.append(slice(0, shape[dim_idx]))
+                    src_slices = tuple(src_slices)
+                    tgt_slices = tuple(tgt_slices)
 
-                # creating a boolean mask for all start nodes (src) and end nodes (tgt) 
-                # for the respective offset direction
-                # only if src and tgt are True at the same position in their own respective mask, 
-                # a connection is valid (-> valid mask)
-                src_mask = ms_phase_of_interest[src_slices]
-                tgt_mask = ms_phase_of_interest[tgt_slices]
-                valid_mask = src_mask & tgt_mask
-                if not np.any(valid_mask):
-                    continue
+                    # creating a boolean mask for all start nodes (src) and end nodes (tgt) 
+                    # for the respective offset direction
+                    # only if src and tgt are True at the same position in their own respective mask, 
+                    # a connection is valid (-> valid mask)
+                    src_mask = ms_phase_of_interest[src_slices]
+                    tgt_mask = ms_phase_of_interest[tgt_slices]
+                    valid_mask = src_mask & tgt_mask
+                    if not np.any(valid_mask):
+                        continue
 
-                # finding the flat indices for src and tgt is now simple by applying the respective masks:
-                # from all flat indices, take the src nodes for the respective offset direction. From these only
-                # take the flat node numbers which have a valid connection in this direction. 
-                # Analogous for tgt. 
-                src_idx = idx_grid[src_slices][valid_mask]
-                tgt_idx = idx_grid[tgt_slices][valid_mask]
+                    # finding the flat indices for src and tgt is now simple by applying the respective masks:
+                    # from all flat indices, take the src nodes for the respective offset direction. From these only
+                    # take the flat node numbers which have a valid connection in this direction. 
+                    # Analogous for tgt. 
+                    src_idx = idx_grid[src_slices][valid_mask]
+                    tgt_idx = idx_grid[tgt_slices][valid_mask]
 
-                # calculate the weight for the graph nodes.
-                # Here, the weigth is the distance between voxels in the current offset direction
-                weight = float(np.linalg.norm(np.array(off) * np.array(voxel_dimension[:ndim])))
+                    # calculate the weight for the graph nodes.
+                    # Here, the weigth is the distance between voxels in the current offset direction
+                    weight = float(np.linalg.norm(np.array(off) * np.array(voxel_dimension[:dimensionality])))
 
-                # put all found flat node indices and weights into the respective lists.
-                rows.extend(src_idx.tolist())
-                cols.extend(tgt_idx.tolist())
-                data.extend([weight] * len(src_idx))
+                    # put all found flat node indices and weights into the respective lists.
+                    rows.extend(src_idx.tolist())
+                    cols.extend(tgt_idx.tolist())
+                    data.extend([weight] * len(src_idx))
 
-                # also add reverse direction for undirected graph 
-                # (this should only be used if only one-way connections between voxels are considered,
-                #  but it seems that performancewise this doesn't make a big difference.)
-                # rows.extend(tgt_idx.tolist())
-                # cols.extend(src_idx.tolist())
-                # data.extend([weight] * len(src_idx))
+                if len(rows) == 0:
+                    return np.float64(0)
 
-            if len(rows) == 0:
+                # map flat rows/cols to compact indices
+                # This is to reduce the size of the resulting matrix. 
+                # This is a NxN matrix where N is not the number of True voxels.
+                # Without the mapping, the size would be MxM with M beeing the total number of 
+                # all voxels, which might be much larger than N.
+                rows_m = [mapping[int(r)] for r in rows]
+                cols_m = [mapping[int(c)] for c in cols]
+
+                logging.info('Finished creating inputs for sparse adjacency matrix.')
+                # sparse matrix with data_val, rows, cols and shape args
+                A = coo_matrix((np.array(data, dtype=np.float64), (np.array(rows_m), np.array(cols_m))), shape=(len(node_flat), len(node_flat))).tocsr()
+                logging.info('Finished creating sparse adjacency matrix.')
+
+                return A, node_coords, node_flat, mapping
+
+            A, node_coords, node_flat, mapping = create_adjacency_sparse_matrix(ms_phase_of_interest)
+
+            def get_source_and_target_nodes(node_coords:np.ndarray,
+                                            direction:int, 
+                                            is_direction_reversed:bool=False):
+                            # identify source and target compact indices
+                idx_max_position_in_direction = shape[direction] - 1
+                if is_direction_reversed:
+                    source_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
+                    target_mask_coords = node_coords[:, direction] == 0
+                else:
+                    source_mask_coords = node_coords[:, direction] == 0
+                    target_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
+                
+                if not np.any(source_mask_coords) or not np.any(target_mask_coords):
+                    return np.float64(0)
+
+                source_compact = [mapping[int(f)] for f in node_flat[source_mask_coords]]
+                target_compact = [mapping[int(f)] for f in node_flat[target_mask_coords]]
+
+                return source_compact, target_compact
+
+            source_compact, target_compact = get_source_and_target_nodes(node_coords, direction, is_direction_reversed)
+            if not np.any(source_compact) or not np.any(target_compact):
                 return np.float64(0)
-
-            # map flat rows/cols to compact indices
-            # This is to reduce the size of the resulting matrix. 
-            # This is a NxN matrix where N is not the number of True voxels.
-            # Without the mapping, the size would be MxM with M beeing the total number of 
-            # all voxels, which might be much larger than N.
-            rows_m = [mapping[int(r)] for r in rows]
-            cols_m = [mapping[int(c)] for c in cols]
-
-            logging.info('Finished creating inputs for sparse adjacency matrix.')
-            # sparse matrix with data_val, rows, cols and shape args
-            A = coo_matrix((np.array(data, dtype=np.float64), (np.array(rows_m), np.array(cols_m))), shape=(len(node_flat), len(node_flat))).tocsr()
-            logging.info('Finished creating sparse adjacency matrix.')
             
-            # identify source and target compact indices
-            idx_max_position_in_direction = shape[direction] - 1
-            if is_direction_reversed:
-                source_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
-                target_mask_coords = node_coords[:, direction] == 0
-            else:
-                source_mask_coords = node_coords[:, direction] == 0
-                target_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
-            
-            if not np.any(source_mask_coords) or not np.any(target_mask_coords):
-                return np.float64(0)
 
-            source_compact = [mapping[int(f)] for f in node_flat[source_mask_coords]]
-            target_compact = [mapping[int(f)] for f in node_flat[target_mask_coords]]
 
             # run multi-source dijkstra (compute distances from all sources)
             # [[dist_from_src_node1_to_node1, dist_from_src_node1_to_node2, dist_from_src_node1_to_node3, ...]]
@@ -353,12 +359,12 @@ if __name__=="__main__":
     #         print('\n\n')
 
 
-    minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
+    # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600.npy')
-
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    
-    # ms = np.load(minimal_example_ms)
+    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+
+    ms = np.load(minimal_example_ms)
 
     # ms = ms[:,:,-2:-1]
 
@@ -381,11 +387,11 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
-    ms = np.ones((5,5,5))
-    ms[0,0,0] = 0
-    ms[1,1,1] = 0
-    ms[2,2,2] = 0
-    ms = ms.astype(int)
+    # ms = np.ones((5,5,5))
+    # ms[0,0,0] = 0
+    # ms[1,1,1] = 0
+    # ms[2,2,2] = 0
+    # ms = ms.astype(int)
 
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
