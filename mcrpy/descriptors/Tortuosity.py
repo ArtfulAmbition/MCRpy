@@ -27,8 +27,9 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions, slice_ndarray, plot_slices
 import logging
+from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
 
-class Tortuosity(PhaseDescriptor):
+class Tortuosity(PhaseDescriptor3D):
     is_differentiable = False
     tf.experimental.numpy.experimental_enable_numpy_behavior()
 
