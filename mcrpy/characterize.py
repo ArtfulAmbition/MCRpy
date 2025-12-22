@@ -80,7 +80,7 @@ def make_descriptor_functions(
         descriptors = {descriptor_type: descriptor_factory.permute(
             descriptor_type, microstructure_shape, settings.n_phases, 
             isotropic=settings.isotropic, mode=settings.slice_mode,
-            arguments=vars(settings)) 
+            full_3d = settings.full_3d, arguments=vars(settings)) 
             for descriptor_type in settings.descriptor_types}
     else:
         raise ValueError('Microstructure must be 2D or 3D')
