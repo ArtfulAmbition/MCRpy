@@ -261,6 +261,18 @@ def make_image_padder(pad_x: int, pad_y: int):
         return img_tiled_xy
     return tile_img
 
+def make_image_padder_3d(pad_x: int, pad_y: int, pad_z: int):
+
+    @tf.function
+    @tf.recompute_grad
+    def tile_img(img: tf.Tensor) -> tf.Tensor:
+        """Tile an image. Needed for periodic boundary conditions in convolution."""
+        img_tiled_x = tf.concat([img, img[:, :pad_x, :, :, :]], axis=1)
+        img_tiled_xy = tf.concat([img_tiled_x, img_tiled_x[:, :, :pad_y, :, :]], axis=2)
+        img_tiled_xyz = tf.concat([img_tiled_xy, img_tiled_xy[:, :, :, :pad_z, :]], axis=3)
+        return img_tiled_xyz
+    return tile_img
+
 def test_padding():
     import matplotlib.pyplot as plt
     import os
