@@ -32,6 +32,7 @@ class CommonSettings:
 class DescriptorSettings:
     descriptor_types: List[str] = field(default_factory=lambda: ['Correlations'])
     slice_mode: str = 'average'
+    full_3d: bool = False
     nl_method: str = 'relu'
     limit_to: int = 16
     threshold_steepness: float = 10.0
