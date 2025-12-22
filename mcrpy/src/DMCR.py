@@ -43,6 +43,7 @@ from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 from mcrpy.src.Symmetry import Symmetry
 from mcrpy.descriptors.OrientationDescriptor import OrientationDescriptor
 from mcrpy.descriptors.MultiPhaseDescriptor import MultiPhaseDescriptor
+from mcrpy.descriptors.MultiPhaseDescriptor3D import MultiPhaseDescriptor3D
 
 class DMCR:
     def __init__(self,
@@ -69,6 +70,7 @@ class DMCR:
             batch_size: int = 1,
             symmetry: Symmetry = None,
             initial_microstructure: Microstructure = None,
+            full_3d: bool = False, 
             **kwargs):
         """Initializer for differentiable microstructure characterisation and reconstruction (DMCR).
         DMCR formulates microstructure reconstruction as a differentiable optimization problem.
@@ -119,6 +121,7 @@ class DMCR:
         self.greedy = greedy
         self.symmetry = symmetry
         self.batch_size = batch_size
+        self.full_3d = full_3d
         self.initial_microstructure = initial_microstructure
         self.minimal_resolution = minimal_resolution if minimal_resolution is not None else limit_to
         tf.keras.backend.set_floatx("float64")
@@ -160,7 +163,8 @@ class DMCR:
 
         # find which descriptors are MultiPhaseDescriptors
         self.descriptor_is_multiphase = [issubclass( 
-            descriptor_factory.descriptor_classes[descriptor_type], MultiPhaseDescriptor) 
+            descriptor_factory.descriptor_classes[descriptor_type], MultiPhaseDescriptor) or issubclass( 
+            descriptor_factory.descriptor_classes[descriptor_type], MultiPhaseDescriptor3D)  
             for descriptor_type in self.descriptor_types]
 
         # initialize some values for later assertion
@@ -182,6 +186,7 @@ class DMCR:
                 'desired_shape_extended': self.desired_shape_extended,
                 'n_phases': self.n_phases,
                 'symmetry': self.symmetry,
+                'full_3d': self.full_3d,
                 **self.kwargs
                 }
         if self.non_cubic_3d:
@@ -386,7 +391,7 @@ class DMCR:
 
         self.opt.set_call_loss(loss_computation.make_call_loss(
                 self.loss, self.ms, self.is_gradient_based, sparse=self.opt.is_sparse,
-                greedy=self.greedy, batch_size = self.batch_size))
+                greedy=self.greedy, batch_size = self.batch_size, full_3d = self.full_3d))
 
         # pass vf information extra if needed
         if optimizer_factory.optimizer_classes[self.optimizer_type].is_vf_based:
@@ -412,6 +417,7 @@ class DMCR:
                     'desired_shape_extended': self.desired_shape_extended,
                     'descriptor_is_multiphase': self.descriptor_is_multiphase,
                     'use_orientations': self.use_orientations,
+                    'full_3d': self.full_3d,
                     **self.kwargs,
                     }
         self.loss = loss_factory.create(self.loss_type, non_cubic_3d=self.non_cubic_3d, arguments=loss_kwargs)
