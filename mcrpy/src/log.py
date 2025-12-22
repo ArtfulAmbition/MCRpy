@@ -41,7 +41,7 @@ def setup_logging(target_folder: str, args: argparse.Namespace):
         logging_filename = f'{args.logfile_name}{logfile_additives}.log'
         logging_filepath = os.path.join(target_folder, logging_filename)
         logging.basicConfig(filename=logging_filepath,
-                            format=logging_format, level=args.logging_level)
+                            format=logging_format, level=args.logging_level, force=True)
 
 def log_this(function):
     """Decorator for logging a function without much boilerplate.

@@ -43,7 +43,7 @@ class Tortuosity(PhaseDescriptor3D):
         direction : int = 0, #0:x, 1:y, 2:z
         is_direction_reversed:bool = False, # The calculation of the Tortuosity is direction dependent. 
                                             # Set is_direction_reversed to True if the calculation should be from highest values in specofied direction to smallest values.
-        phase_of_interest : Union[int,list[int]] = [2], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 
@@ -52,6 +52,7 @@ class Tortuosity(PhaseDescriptor3D):
         logging.info(f'input: method: {method}')
         logging.info(f'input: direction: {direction}')
         logging.info(f'input: voxel_dimension: {voxel_dimension}')
+
 
         assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
         assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
@@ -65,7 +66,10 @@ class Tortuosity(PhaseDescriptor3D):
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             logging.info('Entering DSPSM function.')
-            
+ 
+            # Use logging (reliable) instead of tf.print for logfile output
+            logging.warning(f'ms shape: {ms_phase_of_interest.shape}')
+
             # Quick exit if ms_phase_of_interest contains only False
             if not ms_phase_of_interest.any():
                 logging.debug("DSPSM: No phase voxels found, returning 0")
