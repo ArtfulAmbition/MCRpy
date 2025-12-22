@@ -16,14 +16,21 @@
    limitations under the License.
 """
 
-
 from __future__ import annotations
+
+
+import os
+# Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
+# - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
+#   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
+# - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
 
 import argparse
 import contextlib
 import logging
 import pickle
-import os
 from typing import Any, Callable, Dict, List, Tuple, Union
 import tensorflow as tf
 with contextlib.suppress(Exception):
