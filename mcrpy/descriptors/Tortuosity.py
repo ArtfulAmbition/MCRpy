@@ -167,7 +167,7 @@ class Tortuosity(PhaseDescriptor3D):
 
             A, node_coords, node_flat, mapping = create_adjacency_sparse_matrix(ms_phase_of_interest)
 
-            def get_source_and_target_nodes(node_coords:np.ndarray,
+            def get_source_and_target_nodes_single_direction(node_coords:np.ndarray,
                                             direction:int, 
                                             is_direction_reversed:bool=False):
                             # identify source and target compact indices
@@ -187,12 +187,10 @@ class Tortuosity(PhaseDescriptor3D):
 
                 return source_compact, target_compact
 
-            source_compact, target_compact = get_source_and_target_nodes(node_coords, direction, is_direction_reversed)
+            source_compact, target_compact = get_source_and_target_nodes_single_direction(node_coords, direction, is_direction_reversed)
             if not np.any(source_compact) or not np.any(target_compact):
                 return np.float64(0)
             
-
-
             # run multi-source dijkstra (compute distances from all sources)
             # [[dist_from_src_node1_to_node1, dist_from_src_node1_to_node2, dist_from_src_node1_to_node3, ...]]
             try:
