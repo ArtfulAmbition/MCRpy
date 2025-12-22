@@ -34,7 +34,7 @@ def setup_logging(target_folder: str, args: argparse.Namespace):
     """Set up logging."""
     logging_format = '%(asctime)s on %(levelname)s: %(message)s'
     if target_folder is None:
-        logging.basicConfig(format=logging_format, level=args.logging_level)
+        logging.basicConfig(format=logging_format, level=args.logging_level, force=True)
     else:
         logfile_additives = '-' + time.asctime().replace(
                 ' ', '-').replace(':', '-') if args.logfile_date else ''
