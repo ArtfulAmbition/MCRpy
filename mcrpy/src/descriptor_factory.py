@@ -82,25 +82,18 @@ def permute(
         n_phases: int,
         isotropic: bool = False,
         mode: str = 'average',
-        arguments: Dict[str, Any] = None) -> Callable:
+        arguments: Dict[str, Any] = None,
+        full_3d: bool = False) -> Callable:
     assert len(shape_3d) == 3
     assert arguments is not None
-
-    # if no slicing is to be performed, simply return the 3D descriptor:
-    if mode.lower() == 'no_slicing':
+    
+    if full_3d:
+        assert shape_3d[0] == shape_3d[1] == shape_3d[2]
         descriptor_function = create(descriptor_type, arguments=arguments)
-        def get_full3D_descriptor(ms: Microstructure) -> np.ndarray:
-            ms_full3D = ms.numpy()
-            full3D_descriptor = descriptor_function(ms_full3D)
-            return full3D_descriptor.numpy()
-    
-        def permutation_loop(ms: Microstructure):
-            descriptors = [get_full3D_descriptor(ms)]
-            return tuple(descriptors)
-    
-        return permutation_loop
+        def call_directly(ms: Microstructure):
+            return descriptor_function(ms.x)
+        return call_directly
 
-    # if slicing is to be performed:
     if shape_3d[0] == shape_3d[1] == shape_3d[2]:
         descriptor_functions = [create(descriptor_type, arguments=arguments)] * 3
     else:
@@ -135,7 +128,7 @@ def permute(
                 dim_descriptor /= shape_3d[spatial_dim]
                 descriptors.append(dim_descriptor)
             return np.sum(descriptors, axis=0) / 3 if isotropic else tuple(descriptors)
-        
+
     elif mode.lower() == 'sample':
         def permutation_loop(ms: Microstructure):
             descriptors = []
