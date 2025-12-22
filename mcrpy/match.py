@@ -204,6 +204,8 @@ if __name__ == '__main__':
     parser.set_defaults(logfile_date=False)
     parser.add_argument('--non_periodic', dest='periodic', action='store_false')
     parser.set_defaults(periodic=True)
+    parser.add_argument('--full_3d', dest='full_3d', action='store_true')
+    parser.set_defaults(full_3d=False)
     parser.add_argument('--grey_values', dest='grey_values', action='store_true')
     parser.set_defaults(grey_values=False)
     parser.add_argument('--isotropic', dest='isotropic', action='store_true')
