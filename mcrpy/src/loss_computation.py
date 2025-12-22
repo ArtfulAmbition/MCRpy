@@ -171,18 +171,28 @@ def make_3d_nograds(
 
     return loss_accumulation
 
+def make_call_directly(loss_function):
+    def call_directly(ms: Microstructure):
+        return loss_function(ms.x)
+    return call_directly
+
 def make_call_loss(
         loss_function: Union[callable, List[callable], Tuple[callable]], 
         ms: Microstructure, 
         is_gradient_based: bool, 
         sparse: bool = False,
         greedy: bool = False,
-        batch_size: int = 1) -> callable:  # sourcery skip: remove-redundant-if
+        batch_size: int = 1,
+        full_3d: bool = False) -> callable:  # sourcery skip: remove-redundant-if
     """Make and return a function that computes the loss_function and
     possibly the gradient given a Microstructure.
     """
     ms_is_3d = ms.is_3D
     ms_is_2d = not ms_is_3d
+    if full_3d:
+        assert ms_is_3d
+        assert not is_gradient_based
+        return make_call_directly(loss_function)
     if ms_is_2d and not is_gradient_based:
         return make_2d_nograds(loss_function)
     if ms_is_2d and is_gradient_based:
