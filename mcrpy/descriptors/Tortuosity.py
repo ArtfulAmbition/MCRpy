@@ -53,218 +53,227 @@ class Pathfinder():
         self.unique_target_indices = []
         self.unique_sources_indices = []
 
+        # basic checks
         assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
-        assert isinstance(self.direction,list) or isinstance(self.direction,int)
+        assert isinstance(self.direction, (list, int)), "Error: direction must be int or list of ints." 
+        # fix voxel_dimension accidentally being a 1-tuple if trailing comma existed
+        if isinstance(voxel_dimension, tuple) and len(voxel_dimension) == 1 and isinstance(voxel_dimension[0], tuple):
+            self.voxel_dimension = voxel_dimension[0]
+        else:
+            self.voxel_dimension = voxel_dimension
 
-        def abort_calculation(self):
-            self.early_exit = True
-            self.tortuosity = np.float64(0) 
+        # list that holds the direction corresponding to each source/target pair
+        self.compact_direction_list = []
 
-        def construct_adjacency_matrix(self):
-            #each position gets a scalar idx (=flat indices)
-            idx_grid = np.arange(ms_phase_of_interest.size).reshape(self.shape) 
+    def abort_calculation(self):
+        """No Paths can be found. Stop calculation and set tortuosity to zero."""
+        self.early_exit = True
+        self.tortuosity = np.float64(0)
 
-            # coordinates where ms_phase_of_interest is True
-            self.node_coords = np.argwhere(ms_phase_of_interest)
-            
-            # Quick exit if no nodes are present
-            if self.node_coords.size == 0:
-                abort_calculation()
-                return 
-            
-            # transforming node_coords into an 1D array using flat indices 
-            # (single int describes the position in an array)
-            self.node_flat = np.ravel_multi_index(self.node_coords.T, self.shape) 
-            
-            # mapping flat index -> compact index 
-            # The compact index is basically the graph nodal number, so from 0 to n-1 nodes
-            self.mapping = {int(flat): i for i, flat in enumerate(self.node_flat)}
+    def construct_adjacency_matrix(self):
+        """Build sparse adjacency matrix using the configured connectivity."""
+        ms = self.ms_phase_of_interest
+        # each position gets a scalar idx (=flat indices)
+        idx_grid = np.arange(ms.size).reshape(self.shape)
 
-            # Initializing the lists needed to create the sparse matrix
-            rows = []
-            cols = []
-            data = []
+        # coordinates where ms_phase_of_interest is True
+        self.node_coords = np.argwhere(ms)
 
-            # determine connectivity (in which direction are voxels considered as connected?)
-            connectivity_directions = get_connectivity_directions(self.dimensionality, 
-                                                                  connectivity=self.connectivity)
+        # Quick exit if no nodes are present
+        if self.node_coords.size == 0:
+            self.abort_calculation()
+            return False
 
-            # iterate over all connectivity offsets
-            for off in connectivity_directions:
-                off = tuple(int(x) for x in off) #making sure that all direction (= offset) tuples are of type int
-                # compute slices for source and target to avoid wrap-around
-                src_slices = []
-                tgt_slices = []
-                for dim_idx, o in enumerate(off):
-                    if o > 0:
-                        src_slices.append(slice(0, self.shape[dim_idx] - o))
-                        tgt_slices.append(slice(o, self.shape[dim_idx]))
-                    elif o < 0:
-                        src_slices.append(slice(-o, self.shape[dim_idx]))
-                        tgt_slices.append(slice(0, self.shape[dim_idx] + o))
-                    else:
-                        src_slices.append(slice(0, self.shape[dim_idx]))
-                        tgt_slices.append(slice(0, self.shape[dim_idx]))
-                src_slices = tuple(src_slices)
-                tgt_slices = tuple(tgt_slices)
+        # transforming node_coords into an 1D array using flat indices
+        self.node_flat = np.ravel_multi_index(self.node_coords.T, self.shape)
 
-                # creating a boolean mask for all start nodes (src) and end nodes (tgt) 
-                # for the respective offset direction
-                # only if src and tgt are True at the same position in their own respective mask, 
-                # a connection is valid (-> valid mask)
-                src_mask = ms_phase_of_interest[src_slices]
-                tgt_mask = ms_phase_of_interest[tgt_slices]
-                valid_mask = src_mask & tgt_mask
-                if not np.any(valid_mask):
-                    continue
+        # mapping flat index -> compact index
+        self.mapping = {int(flat): i for i, flat in enumerate(self.node_flat)}
 
-                # finding the flat indices for src and tgt is now simple by applying the respective masks:
-                # from all flat indices, take the src nodes for the respective offset direction. From these only
-                # take the flat node numbers which have a valid connection in this direction. 
-                # Analogous for tgt. 
-                src_idx = idx_grid[src_slices][valid_mask]
-                tgt_idx = idx_grid[tgt_slices][valid_mask]
+        rows = []
+        cols = []
+        data = []
 
-                # calculate the weight for the graph nodes.
-                # Here, the weigth is the distance between voxels in the current offset direction
-                weight = float(np.linalg.norm(np.array(off) * np.array(voxel_dimension[:dimensionality])))
+        connectivity_directions = get_connectivity_directions(self.dimensionality, connectivity=self.connectivity)
 
-                # put all found flat node indices and weights into the respective lists.
-                rows.extend(src_idx.tolist())
-                cols.extend(tgt_idx.tolist())
-                data.extend([weight] * len(src_idx))
-
-            if len(rows) == 0:
-                abort_calculation()
-                return
-
-            # map flat rows/cols to compact indices
-            # This is to reduce the size of the resulting matrix. 
-            # This is a NxN matrix where N is not the number of True voxels.
-            # Without the mapping, the size would be MxM with M beeing the total number of 
-            # all voxels, which might be much larger than N.
-            rows_m = [self.mapping[int(r)] for r in rows]
-            cols_m = [self.mapping[int(c)] for c in cols]
-
-            logging.info('Finished creating inputs for sparse adjacency matrix.')
-            # sparse matrix with data_val, rows, cols and shape args
-            self.adjacency_matrix = coo_matrix((np.array(data, dtype=np.float64), 
-                            (np.array(rows_m), 
-                                np.array(cols_m))), 
-                                shape=(len(self.node_flat), len(self.node_flat))).tocsr()
-            logging.info('Finished creating sparse adjacency matrix.')
-
-        def find_compact_border_node_coords(direction:int, border_type:str = 'max'):
-            if border_type.lower() == 'min':
-                idx_in_direction = 0
-            elif border_type.lower() == 'max':
-                idx_in_direction = self.shape[direction] - 1
-            else: 
-                raise ValueError("extremum needs to be 'min' or 'max'.")
-            
-            mask_coordinates = self.node_coords[:, direction] == idx_in_direction
-            border_nodes_compact = [self.mapping[int(f)] for f in self.node_flat[mask_coordinates]]
-            return border_nodes_compact
-
-        def find_compact_source_and_target_nodes():
-            if isinstance(direction,int):
-                direction_list = [direction] 
-            else:
-                direction_list = direction
-
-            for dir in direction_list:
-                if self.direction_mode == 'positive':
-                    self.compact_source_list.append(find_compact_border_node_coords(direction=dir, border_type='min'))
-                    self.compact_target_list.append(find_compact_border_node_coords(direction=dir, border_type='max'))
-                elif self.direction_mode == 'negative':
-                    self.compact_source_list.append(find_compact_border_node_coords(direction=dir, border_type='max'))
-                    self.compact_target_list.append(find_compact_border_node_coords(direction=dir, border_type='min'))
-                elif self.direction_mode == 'both':
-                    self.compact_source_list.append(find_compact_border_node_coords(direction=dir, border_type='min'))
-                    self.compact_target_list.append(find_compact_border_node_coords(direction=dir, border_type='max'))
-                    self.compact_source_list.append(find_compact_border_node_coords(direction=dir, border_type='max'))
-                    self.compact_target_list.append(find_compact_border_node_coords(direction=dir, border_type='min'))
-
-            if not self.compact_source_list or not self.compact_target_list:
-                abort_calculation()
-                return
-
-
-            def get_source_and_target_nodes_single_direction(node_coords:np.ndarray,
-                                            direction:int, 
-                                            is_direction_reversed:bool=False):
-                            # identify source and target compact indices
-                idx_max_position_in_direction = shape[direction] - 1
-                if is_direction_reversed:
-                    source_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
-                    target_mask_coords = node_coords[:, direction] == 0
+        for off in connectivity_directions:
+            off = tuple(int(x) for x in off)
+            src_slices = []
+            tgt_slices = []
+            for dim_idx, o in enumerate(off):
+                if o > 0:
+                    src_slices.append(slice(0, self.shape[dim_idx] - o))
+                    tgt_slices.append(slice(o, self.shape[dim_idx]))
+                elif o < 0:
+                    src_slices.append(slice(-o, self.shape[dim_idx]))
+                    tgt_slices.append(slice(0, self.shape[dim_idx] + o))
                 else:
-                    source_mask_coords = node_coords[:, direction] == 0
-                    target_mask_coords = node_coords[:, direction] == idx_max_position_in_direction
-                
-                if not np.any(source_mask_coords) or not np.any(target_mask_coords):
-                    return np.float64(0)
+                    src_slices.append(slice(0, self.shape[dim_idx]))
+                    tgt_slices.append(slice(0, self.shape[dim_idx]))
+            src_slices = tuple(src_slices)
+            tgt_slices = tuple(tgt_slices)
 
-                source_compact = [mapping[int(f)] for f in node_flat[source_mask_coords]]
-                target_compact = [mapping[int(f)] for f in node_flat[target_mask_coords]]
+            src_mask = ms[src_slices]
+            tgt_mask = ms[tgt_slices]
+            valid_mask = src_mask & tgt_mask
+            if not np.any(valid_mask):
+                continue
 
-                return source_compact, target_compact
+            src_idx = idx_grid[src_slices][valid_mask]
+            tgt_idx = idx_grid[tgt_slices][valid_mask]
 
-        def calculate_distance_matrix():
+            weight = float(np.linalg.norm(np.array(off) * np.array(self.voxel_dimension[:self.dimensionality])))
 
-            all_sources = np.concatenate(self.compact_source_list)
-            all_targets = np.concatenate(self.compact_target_list)
+            rows.extend(src_idx.tolist())
+            cols.extend(tgt_idx.tolist())
+            data.extend([weight] * len(src_idx))
 
-            try:
-                logging.debug(f"DSPSM: Running Dijkstra with a total of {len(all_sources)} uniuque source(s) and {len(all_targets)} unique target(s)")
-                self.distance_matrix = sp_dijkstra(csgraph=self.adjacency_matrix, directed=False, indices=all_sources)
-                logging.debug(f"DSPSM: Dijkstra completed")
-            except Exception as e:
-                logging.error(f"DSPSM: Dijkstra computation failed: {e}")
-                print("DSPSM: Dijkstra computation failed. Returning zero.")
-                return np.float64(0)
-            logging.info('Finished multi-source dijkstra computation.')
+        if len(rows) == 0:
+            self.abort_calculation()
+            return False
 
-        def get_shortest_paths_from_distance_matrix():
+        rows_m = [self.mapping[int(r)] for r in rows]
+        cols_m = [self.mapping[int(c)] for c in cols]
 
-            assert len(self.compact_source_list) == len(self.compact_source_list), "Error: the number of source and target arrays need to be equal."
+        logging.info('Finished creating inputs for sparse adjacency matrix.')
+        self.adjacency_matrix = coo_matrix((np.array(data, dtype=np.float64), (np.array(rows_m), np.array(cols_m))),
+                                          shape=(len(self.node_flat), len(self.node_flat))).tocsr()
+        logging.info('Finished creating sparse adjacency matrix.')
+        return True
 
-            all_sources = np.concatenate(self.compact_source_list)
-            all_targets = np.concatenate(self.compact_target_list)
+    def find_compact_border_node_coords(self, direction: int, border_type: str = 'max'):
+        if border_type.lower() == 'min':
+            idx_in_direction = 0
+        elif border_type.lower() == 'max':
+            idx_in_direction = self.shape[direction] - 1
+        else:
+            raise ValueError("extremum needs to be 'min' or 'max'.")
 
-            # dist_matrix shape (n_sources, n_nodes)
-            # For each target in each source-target combination, find the minimal distance from any source
+        mask_coordinates = self.node_coords[:, direction] == idx_in_direction
+        border_nodes_compact = [self.mapping[int(f)] for f in self.node_flat[mask_coordinates]]
+        return border_nodes_compact
+
+    def find_compact_source_and_target_nodes(self):
+        # accept int or list
+        if isinstance(self.direction, int):
+            direction_list = [self.direction]
+        else:
+            direction_list = list(self.direction)
+
+        for dir in direction_list:
+            if self.direction_mode == 'positive':
+                self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
+                self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
+                self.compact_direction_list.append(dir)
+            elif self.direction_mode == 'negative':
+                self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
+                self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
+                self.compact_direction_list.append(dir)
+            elif self.direction_mode == 'both':
+                self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
+                self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
+                self.compact_direction_list.append(dir)
+
+                self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
+                self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
+                self.compact_direction_list.append(dir)
+
+        if not self.compact_source_list or not self.compact_target_list:
+            self.abort_calculation()
+            return False
+        return True
+
+    def calculate_distance_matrix(self):
+        if self.adjacency_matrix is None:
+            logging.error('Adjacency matrix not constructed.')
+            return False
+
+        all_sources = np.concatenate(self.compact_source_list) if len(self.compact_source_list) > 0 else np.array([], dtype=int)
+        all_targets = np.concatenate(self.compact_target_list) if len(self.compact_target_list) > 0 else np.array([], dtype=int)
+
+        if all_sources.size == 0 or all_targets.size == 0:
+            logging.warning('No sources or targets found for Dijkstra.')
+            self.abort_calculation()
+            return False
+
+        try:
+            logging.debug(f"DSPSM: Running Dijkstra with a total of {len(all_sources)} unique source(s) and {len(all_targets)} unique target(s)")
+            self.distance_matrix = sp_dijkstra(csgraph=self.adjacency_matrix, directed=False, indices=all_sources)
+            logging.debug(f"DSPSM: Dijkstra completed")
+        except Exception as e:
+            logging.error(f"DSPSM: Dijkstra computation failed: {e}")
+            self.abort_calculation()
+            return False
+        logging.info('Finished multi-source dijkstra computation.')
+        return True
+
+    def get_shortest_paths_from_distance_matrix(self):
+        """Extract shortest path lengths from the distance matrix and compute tortuosity.
+        For each source/target group we compute the minimum distance from any group source to every group target,
+        then compute the group's mean path length and normalize by the physical length in that direction.
+        The final tortuosity is the mean across group tortuosities.
+        """
+        if self.distance_matrix is None:
+            logging.error('Distance matrix not computed.')
+            return np.float64(0)
+
+        all_sources = np.concatenate(self.compact_source_list)
+        dist_matrix = self.distance_matrix
+        # normalize dist_matrix to 2D where rows correspond to sources
+        if dist_matrix.ndim == 1:
+            dist_matrix = dist_matrix[np.newaxis, :]
+
+        group_tortuosities = []
+
+        for ind in range(len(self.compact_source_list)):
+            group_sources = np.array(self.compact_source_list[ind], dtype=int)
+            group_targets = np.array(self.compact_target_list[ind], dtype=int)
+            group_dir = self.compact_direction_list[ind]
+
+            if group_sources.size == 0 or group_targets.size == 0:
+                continue
+
+            # find rows in dist_matrix that correspond to this group's sources
+            all_srcs = np.concatenate(self.compact_source_list)
+            source_rows = np.where(np.isin(all_srcs, group_sources))[0]
+
             path_length_list = []
-            for ind in range(len(self.compact_source_list)):
-
-                compact_sources = self.compact_source_list[ind]
-                target_sources = self.compact_source_list[ind]
-
-                for t_idx in target_sources: 
-
-                source_mask = np.where
-                target_mask = 
-
-                for t_idx in self.unique_target_indices:
- 
-                    # extract column for target across sources
-                    if dist_matrix.ndim == 1: # (if there is only one source node)
-                        dists = np.array([dist_matrix[t_idx]])
-                    else: # (if there are more than one source node)
-                        dists = dist_matrix[:, t_idx] # get all distances from all source nodes to all targets
-                    finite = dists[np.isfinite(dists)]
-                    if finite.size > 0:
-                        path_length_list.append(float(np.min(finite))) #only add the shortest paths from source to target
+            for t_idx in np.unique(group_targets):
+                # extract distances from all source rows to target node (column t_idx)
+                dists = dist_matrix[source_rows, t_idx]
+                finite = dists[np.isfinite(dists)]
+                if finite.size > 0:
+                    path_length_list.append(float(np.min(finite)))
 
             if not path_length_list:
-                logging.warning("DSPSM: No path lengths computed")
-                return np.float64(0)
+                logging.debug(f"DSPSM: No path lengths computed for group {ind} (dir {group_dir})")
+                continue
 
-            mean_path_length = np.mean(path_length_list)
-            length_of_ms_in_specified_direction = (shape[direction]-1) * voxel_dimension[direction]
-            tortuosity = mean_path_length / length_of_ms_in_specified_direction
-            logging.info(f"DSPSM: Tortuosity = {tortuosity:.4f} (mean path length: {mean_path_length:.2f})")
-            return tortuosity
+            mean_path_length = float(np.mean(path_length_list))
+            length_of_ms = (self.shape[group_dir] - 1) * float(self.voxel_dimension[group_dir])
+            if length_of_ms == 0:
+                logging.warning('Physical length in specified direction is zero. Skipping group.')
+                continue
+            group_tortuosity = mean_path_length / length_of_ms
+            logging.info(f"DSPSM: group {ind} (dir {group_dir}) tortuosity = {group_tortuosity:.4f} (mean path length: {mean_path_length:.2f})")
+            group_tortuosities.append(group_tortuosity)
+
+        if not group_tortuosities:
+            logging.warning("DSPSM: No group tortuosities computed")
+            return np.float64(0)
+
+        self.tortuosity = float(np.mean(group_tortuosities))
+        return self.tortuosity
+
+    def compute(self):
+        """Run full pipeline: adjacency -> sources/targets -> dijkstra -> extract tortuosity."""
+        if not self.construct_adjacency_matrix():
+            return self.tortuosity
+        if not self.find_compact_source_and_target_nodes():
+            return self.tortuosity
+        if not self.calculate_distance_matrix():
+            return self.tortuosity
+        return self.get_shortest_paths_from_distance_matrix()
 
 
 class Tortuosity(PhaseDescriptor3D):
