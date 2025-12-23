@@ -634,9 +634,9 @@ if __name__=="__main__":
     # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600.npy')
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
+    # minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
 
-    ms = np.load(minimal_example_ms)
+    # ms = np.load(minimal_example_ms)
 
     # ms = ms[:,:,-2:-1]
 
@@ -659,11 +659,22 @@ if __name__=="__main__":
     # print(np.unique(ms))
 
 
-    # ms = np.ones((5,5,5))
+    #ms = np.random.randint(low=0,high=2,size=(2,2))
+    ms=np.ones(shape=(2,2)).astype(bool)
     # ms[0,0,0] = 0
     # ms[1,1,1] = 0
     # ms[2,2,2] = 0
-    # ms = ms.astype(int)
+    #ms = ms.astype(int)
+    print(ms)
+
+    pt = Pathfinder(ms_phase_of_interest=ms)
+    pt.construct_adjacency_matrix()
+    pt.find_compact_source_and_target_nodes()
+    pt.calculate_distance_matrix()
+    pt.get_shortest_paths_from_distance_matrix()
+    pt.compute()
+
+    print(pt.get_shortest_paths_from_distance_matrix())
 
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
@@ -712,7 +723,7 @@ if __name__=="__main__":
     #print(f'ms.shape: {ms.shape}')
 
     
-    plotting=True
+    plotting=False
     if plotting:
         ms_to_plot = ms
         if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
@@ -722,14 +733,14 @@ if __name__=="__main__":
 
 ##------------------------------------------------------------------
    
-    tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
+    # tortuosity_descriptor = Tortuosity()
+    # singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor()
 
-    logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
-    mean_tort = singlephase_descriptor(ms)
-    print('\n -----------------------------')
-    print(f'Mean tortuosity value: {mean_tort}')
-    logging.info(f"Standalone execution completed successfully. Result for Mean Tortuosity: {mean_tort}")
-    logging.info("="*60)
+    # logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
+    # mean_tort = singlephase_descriptor(ms)
+    # print('\n -----------------------------')
+    # print(f'Mean tortuosity value: {mean_tort}')
+    # logging.info(f"Standalone execution completed successfully. Result for Mean Tortuosity: {mean_tort}")
+    # logging.info("="*60)
 
 ##------------------------------------------------------------------
