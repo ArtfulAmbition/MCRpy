@@ -52,6 +52,7 @@ class Pathfinder():
         self.compact_target_list = []
         self.unique_target_indices = []
         self.unique_sources_indices = []
+        self.node_flat = np.array([])
 
         # basic checks
         assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
@@ -150,7 +151,9 @@ class Pathfinder():
             raise ValueError("extremum needs to be 'min' or 'max'.")
 
         mask_coordinates = self.node_coords[:, direction] == idx_in_direction
-        border_nodes_compact = [self.mapping[int(f)] for f in self.node_flat[mask_coordinates]]
+        border_nodes_compact = []
+        if self.node_flat.size != 0:
+            border_nodes_compact = [self.mapping[int(f)] for f in self.node_flat[mask_coordinates]]
         return border_nodes_compact
 
     def find_compact_source_and_target_nodes(self):
@@ -660,12 +663,18 @@ if __name__=="__main__":
 
 
     #ms = np.random.randint(low=0,high=2,size=(2,2))
-    ms=np.ones(shape=(2,2)).astype(bool)
+    #ms=np.ones(shape=(2,2)).astype(bool)
+    ms = np.ones(shape=(2,2))
+    ms[0,0] = 1
+    ms[0,1] = 0
+    ms[1,1] = 0
+    ms[1,0] = 1
+    ms = ms.astype(bool)
     # ms[0,0,0] = 0
     # ms[1,1,1] = 0
     # ms[2,2,2] = 0
     #ms = ms.astype(int)
-    print(ms)
+    print(f'ms: {ms}')
 
     pt = Pathfinder(ms_phase_of_interest=ms)
     pt.construct_adjacency_matrix()
