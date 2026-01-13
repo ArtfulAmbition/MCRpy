@@ -33,18 +33,18 @@ class Pathfinder():
     def __init__(self,
                  ms_phase_of_interest: NDArray[np.bool_],
                  connectivity : Union[int,str] = 'sides',
-                 direction : Union[int,list[int]] = 0,
+                 direction_list : Union[int,list[int]] = 0,
                  direction_mode:str = 'positive',
                  voxel_dimension:tuple[float] =(1,1,1)):
         self.ms_phase_of_interest = ms_phase_of_interest
         self.shape = ms_phase_of_interest.shape
         self.dimensionality = len(self.shape)
         self.connectivity = connectivity
-        self.direction = direction
+        self.direction_list = direction_list
         self.direction_mode = direction_mode
         self.voxel_dimension = voxel_dimension,
         self.early_exit = False
-        self.tortuosity = None
+        self.tortuosity_list = []
         self.adjacency_matrix = None
         self.distance_matrix = None
         self.compact_source_list = []
@@ -56,7 +56,9 @@ class Pathfinder():
 
         # basic checks
         assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
-        assert isinstance(self.direction, (list, int)), "Error: direction must be int or list of ints." 
+        assert isinstance(self.direction_list, list), "Error: direction must be a list of ints." 
+        assert all(isinstance(dir, int) and 0 <= dir < self.dimensionality 
+                   for dir in self.direction_list), f"All elements of direction_list must be positve integers smaller than the dimensionality {self.dimensionality}.)"
         # fix voxel_dimension accidentally being a 1-tuple if trailing comma existed
         if isinstance(voxel_dimension, tuple) and len(voxel_dimension) == 1 and isinstance(voxel_dimension[0], tuple):
             self.voxel_dimension = voxel_dimension[0]
@@ -71,7 +73,7 @@ class Pathfinder():
     def abort_calculation(self):
         """No Paths can be found. Stop calculation and set tortuosity to zero."""
         self.early_exit = True
-        self.tortuosity = np.float64(0)
+        self.tortuosity_list.append(np.float64(0))
 
     def construct_adjacency_matrix(self):
         """Build sparse adjacency matrix using the configured connectivity."""
@@ -160,10 +162,10 @@ class Pathfinder():
 
     def find_compact_source_and_target_nodes(self):
         # accept int or list
-        if isinstance(self.direction, int):
-            direction_list = [self.direction]
+        if isinstance(self.direction_list, int):
+            direction_list = [self.direction_list]
         else:
-            direction_list = list(self.direction)
+            direction_list = list(self.direction_list)
 
         for dir in direction_list:
             if self.direction_mode == 'positive':
@@ -271,7 +273,7 @@ class Pathfinder():
             return False
 
         self.path_length_list = path_length_list
-        self.tortuosity = float(np.mean(group_tortuosities))
+        self.tortuosity_list = float(np.mean(group_tortuosities))
         return True
 
     def compute(self):
@@ -684,7 +686,7 @@ if __name__=="__main__":
     print(f'ms: {ms}')
 
     pt = Pathfinder(ms_phase_of_interest=ms,
-                    direction=0)
+                    direction_list=[1])
     # pt.construct_adjacency_matrix()
     # pt.find_compact_source_and_target_nodes()
     # pt.calculate_distance_matrix()
@@ -692,7 +694,7 @@ if __name__=="__main__":
     # pt.compute()
 
     # print(pt.get_shortest_paths_from_distance_matrix())
-    print(f'tort: {pt.tortuosity}')
+    print(f'tort: {pt.tortuosity_list}')
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
     # ms[2,1,0] = 1
