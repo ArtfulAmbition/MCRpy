@@ -53,6 +53,7 @@ class Pathfinder():
         self.unique_sources_indices = []
         self.node_flat = np.array([])
         self.path_length_list = []
+        self.compact_direction_list = [] # list that holds the direction corresponding to each source/target pair
 
         # basic checks
         assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
@@ -63,10 +64,7 @@ class Pathfinder():
         if isinstance(voxel_dimension, tuple) and len(voxel_dimension) == 1 and isinstance(voxel_dimension[0], tuple):
             self.voxel_dimension = voxel_dimension[0]
         else:
-            self.voxel_dimension = voxel_dimension
-
-        # list that holds the direction corresponding to each source/target pair
-        self.compact_direction_list = []
+            self.voxel_dimension = voxel_dimension       
 
         self.compute()
 
@@ -146,7 +144,11 @@ class Pathfinder():
         logging.info('Finished creating sparse adjacency matrix.')
         return True
 
-    def find_compact_border_node_coords(self, direction: int, border_type: str = 'max'):
+    def find_compact_border_node_coords(self, direction: int, border_type: str):
+        ''' return a list of the compact node coordinates of the voxels at the searched for border. 
+        The border is the border in the specified direction (so in x,y or z direction). In each direction 
+        there are two borders (at for example min x-value or max x-value). To specify which border is searched for, 
+        the border type must be specified.'''
         if border_type.lower() == 'min':
             idx_in_direction = 0
         elif border_type.lower() == 'max':
@@ -161,29 +163,30 @@ class Pathfinder():
         return border_nodes_compact
 
     def find_compact_source_and_target_nodes(self):
-        # accept int or list
-        if isinstance(self.direction_list, int):
-            direction_list = [self.direction_list]
-        else:
-            direction_list = list(self.direction_list)
 
-        for dir in direction_list:
+        for dir in self.direction_list:
             if self.direction_mode == 'positive':
+                # this means, that the tortuosity is calculated in positve direction of the specified direction
+                # for example in positive x-direction
                 self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
                 self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
                 self.compact_direction_list.append(dir)
             elif self.direction_mode == 'negative':
+                # this means, that the tortuosity is calculated in the opposite direction of the specified direction
+                # for example in negative x-direction
                 self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
                 self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
-                self.compact_direction_list.append(dir)
+                self.compact_direction_list.append(-dir)
             elif self.direction_mode == 'both':
+                # this means, that the tortuosity is calculated in both the positive and opposite direction of the specified direction
+                # for example in positive and negative x-direction
                 self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
                 self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
                 self.compact_direction_list.append(dir)
 
                 self.compact_source_list.append(self.find_compact_border_node_coords(direction=dir, border_type='max'))
                 self.compact_target_list.append(self.find_compact_border_node_coords(direction=dir, border_type='min'))
-                self.compact_direction_list.append(dir)
+                self.compact_direction_list.append(-dir)
 
         if not self.compact_source_list or not self.compact_target_list:
             self.abort_calculation()
@@ -191,10 +194,6 @@ class Pathfinder():
         return True
 
     def calculate_distance_matrix(self):
-        if self.adjacency_matrix is None:
-            logging.error('Adjacency matrix not constructed.')
-            self.abort_calculation()
-            return False
 
         all_sources = np.concatenate(self.compact_source_list) if len(self.compact_source_list) > 0 else np.array([], dtype=int)
         all_targets = np.concatenate(self.compact_target_list) if len(self.compact_target_list) > 0 else np.array([], dtype=int)
@@ -221,10 +220,6 @@ class Pathfinder():
         then compute the group's mean path length and normalize by the physical length in that direction.
         The final tortuosity is the mean across group tortuosities.
         """
-        if self.distance_matrix is None:
-            logging.error('Distance matrix not computed.')
-            self.abort_calculation()
-            return False
 
         all_sources = np.concatenate(self.compact_source_list)
         dist_matrix = self.distance_matrix
