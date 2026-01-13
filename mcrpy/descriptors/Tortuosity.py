@@ -221,23 +221,20 @@ class Pathfinder():
         The final tortuosity is the mean across group tortuosities.
         """
 
-        all_sources = np.concatenate(self.compact_source_list)
         dist_matrix = self.distance_matrix
         # normalize dist_matrix to 2D where rows correspond to sources
         if dist_matrix.ndim == 1:
             dist_matrix = dist_matrix[np.newaxis, :]
 
-        group_tortuosities = []
+        group_tortuosities = [] #
+        number_of_source_target_groups = len(self.compact_source_list)
 
-        for ind in range(len(self.compact_source_list)):
+        for ind in range(number_of_source_target_groups):
             group_sources = np.array(self.compact_source_list[ind], dtype=int)
             group_targets = np.array(self.compact_target_list[ind], dtype=int)
             group_dir = self.compact_direction_list[ind]
 
-            if group_sources.size == 0 or group_targets.size == 0:
-                continue
-
-            # find rows in dist_matrix that correspond to this group's sources
+            # find rows in dist_matrix that correspond to the current group sources
             all_srcs = np.concatenate(self.compact_source_list)
             source_rows = np.where(np.isin(all_srcs, group_sources))[0]
 
@@ -247,28 +244,22 @@ class Pathfinder():
                 dists = dist_matrix[source_rows, t_idx]
                 finite = dists[np.isfinite(dists)]
                 if finite.size > 0:
-                    path_length_list.append(float(np.min(finite)))
+                    path_length_list.append(float(np.min(finite)))          
 
-            if not path_length_list:
-                logging.debug(f"DSPSM: No path lengths computed for group {ind} (dir {group_dir})")
-                continue
-
-            mean_path_length = float(np.mean(path_length_list))
+            if path_length_list:
+                mean_path_length = float(np.mean(path_length_list))
+            else:
+                mean_path_length = 0
             length_of_ms = (self.shape[group_dir] - 1) * float(self.voxel_dimension[group_dir])
-            if length_of_ms == 0:
-                logging.warning('Physical length in specified direction is zero. Skipping group.')
-                continue
+           
             group_tortuosity = mean_path_length / length_of_ms
+
+
             logging.info(f"DSPSM: group {ind} (dir {group_dir}) tortuosity = {group_tortuosity:.4f} (mean path length: {mean_path_length:.2f})")
             group_tortuosities.append(group_tortuosity)
 
-        if not group_tortuosities:
-            logging.warning("DSPSM: No group tortuosities computed")
-            self.abort_calculation()
-            return False
-
         self.path_length_list = path_length_list
-        self.tortuosity_list = float(np.mean(group_tortuosities))
+        self.tortuosity_list = group_tortuosities
         return True
 
     def compute(self):
@@ -668,7 +659,7 @@ if __name__=="__main__":
 
     #ms = np.random.randint(low=0,high=2,size=(2,2))
     #ms=np.ones(shape=(2,2)).astype(bool)
-    ms = np.ones(shape=(2,2))
+    ms = np.ones(shape=(2,2,2))
     ms[0,0] = 1
     ms[0,1] = 0
     ms[1,1] = 0
@@ -681,7 +672,7 @@ if __name__=="__main__":
     print(f'ms: {ms}')
 
     pt = Pathfinder(ms_phase_of_interest=ms,
-                    direction_list=[1])
+                    direction_list=[0,1,2], direction_mode='both')
     # pt.construct_adjacency_matrix()
     # pt.find_compact_source_and_target_nodes()
     # pt.calculate_distance_matrix()
@@ -690,6 +681,7 @@ if __name__=="__main__":
 
     # print(pt.get_shortest_paths_from_distance_matrix())
     print(f'tort: {pt.tortuosity_list}')
+    print(f'compact direction list: {pt.compact_direction_list}')
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
     # ms[2,1,0] = 1
