@@ -43,7 +43,6 @@ class Pathfinder():
         self.direction = direction
         self.direction_mode = direction_mode
         self.voxel_dimension = voxel_dimension,
-        self.direction = direction
         self.early_exit = False
         self.tortuosity = None
         self.adjacency_matrix = None
@@ -53,6 +52,7 @@ class Pathfinder():
         self.unique_target_indices = []
         self.unique_sources_indices = []
         self.node_flat = np.array([])
+        self.path_length_list = []
 
         # basic checks
         assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
@@ -65,6 +65,8 @@ class Pathfinder():
 
         # list that holds the direction corresponding to each source/target pair
         self.compact_direction_list = []
+
+        self.compute()
 
     def abort_calculation(self):
         """No Paths can be found. Stop calculation and set tortuosity to zero."""
@@ -189,6 +191,7 @@ class Pathfinder():
     def calculate_distance_matrix(self):
         if self.adjacency_matrix is None:
             logging.error('Adjacency matrix not constructed.')
+            self.abort_calculation()
             return False
 
         all_sources = np.concatenate(self.compact_source_list) if len(self.compact_source_list) > 0 else np.array([], dtype=int)
@@ -218,7 +221,8 @@ class Pathfinder():
         """
         if self.distance_matrix is None:
             logging.error('Distance matrix not computed.')
-            return np.float64(0)
+            self.abort_calculation()
+            return False
 
         all_sources = np.concatenate(self.compact_source_list)
         dist_matrix = self.distance_matrix
@@ -263,21 +267,24 @@ class Pathfinder():
 
         if not group_tortuosities:
             logging.warning("DSPSM: No group tortuosities computed")
-            return np.float64(0)
+            self.abort_calculation()
+            return False
 
+        self.path_length_list = path_length_list
         self.tortuosity = float(np.mean(group_tortuosities))
-        return self.tortuosity
+        return True
 
     def compute(self):
         """Run full pipeline: adjacency -> sources/targets -> dijkstra -> extract tortuosity."""
         if not self.construct_adjacency_matrix():
-            return self.tortuosity
+            return False
         if not self.find_compact_source_and_target_nodes():
-            return self.tortuosity
+            return False
         if not self.calculate_distance_matrix():
-            return self.tortuosity
-        return self.get_shortest_paths_from_distance_matrix()
-
+            return False
+        if not self.get_shortest_paths_from_distance_matrix():
+            return False
+        return True
 
 class Tortuosity(PhaseDescriptor3D):
     is_differentiable = False
@@ -676,15 +683,16 @@ if __name__=="__main__":
     #ms = ms.astype(int)
     print(f'ms: {ms}')
 
-    pt = Pathfinder(ms_phase_of_interest=ms)
-    pt.construct_adjacency_matrix()
-    pt.find_compact_source_and_target_nodes()
-    pt.calculate_distance_matrix()
-    pt.get_shortest_paths_from_distance_matrix()
-    pt.compute()
+    pt = Pathfinder(ms_phase_of_interest=ms,
+                    direction=0)
+    # pt.construct_adjacency_matrix()
+    # pt.find_compact_source_and_target_nodes()
+    # pt.calculate_distance_matrix()
+    # pt.get_shortest_paths_from_distance_matrix()
+    # pt.compute()
 
-    print(pt.get_shortest_paths_from_distance_matrix())
-
+    # print(pt.get_shortest_paths_from_distance_matrix())
+    print(f'tort: {pt.tortuosity}')
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
     # ms[2,1,0] = 1
