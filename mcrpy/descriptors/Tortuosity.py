@@ -43,7 +43,6 @@ class Pathfinder():
         self.direction_list = direction_list
         self.direction_mode = direction_mode
         self.voxel_dimension = voxel_dimension,
-        self.early_exit = False
         self.tortuosity_list = []
         self.adjacency_matrix = None
         self.distance_matrix = None
@@ -68,10 +67,19 @@ class Pathfinder():
 
         self.compute()
 
-    def abort_calculation(self):
-        """No Paths can be found. Stop calculation and set tortuosity to zero."""
-        self.early_exit = True
-        self.tortuosity_list.append(np.float64(0))
+    def abort_calculation(self,mode='this_direction'):
+        if mode == 'this_direction':
+            """No Paths can be found in this direction. Stop calculation and set tortuosity to zero."""
+            self.tortuosity_list.append(np.float64(0))
+        if mode == 'global':
+            """No Paths can be found globally (in all directions). 
+            Stop calculation and set tortuosity in all directions to zero."""
+            number_of_direction = len(self.direction_list)
+            if self.direction_mode == 'both':
+                number_of_tortuosities = number_of_direction * 2
+            else:
+                number_of_tortuosities = number_of_direction
+            self.tortuosity_list = [np.float64(0) for x in range(number_of_tortuosities)]
 
     def construct_adjacency_matrix(self):
         """Build sparse adjacency matrix using the configured connectivity."""
@@ -84,7 +92,7 @@ class Pathfinder():
 
         # Quick exit if no nodes are present
         if self.node_coords.size == 0:
-            self.abort_calculation()
+            self.abort_calculation(mode='global')
             return False
 
         # transforming node_coords into an 1D array using flat indices
@@ -132,7 +140,7 @@ class Pathfinder():
             data.extend([weight] * len(src_idx))
 
         if len(rows) == 0:
-            self.abort_calculation()
+            self.abort_calculation(mode='global')
             return False
 
         rows_m = [self.mapping[int(r)] for r in rows]
@@ -189,7 +197,7 @@ class Pathfinder():
                 self.compact_direction_list.append(-dir)
 
         if not self.compact_source_list or not self.compact_target_list:
-            self.abort_calculation()
+            self.abort_calculation(mode='global')
             return False
         return True
 
@@ -200,7 +208,7 @@ class Pathfinder():
 
         if all_sources.size == 0 or all_targets.size == 0:
             logging.warning('No sources or targets found for Dijkstra.')
-            self.abort_calculation()
+            self.abort_calculation(mode='global')
             return False
 
         try:
@@ -209,8 +217,8 @@ class Pathfinder():
             logging.debug(f"DSPSM: Dijkstra completed")
         except Exception as e:
             logging.error(f"DSPSM: Dijkstra computation failed: {e}")
-            self.abort_calculation()
-            return False
+            # self.abort_calculation()
+            # return False
         logging.info('Finished multi-source dijkstra computation.')
         return True
 
@@ -483,9 +491,9 @@ if __name__=="__main__":
     
     # print(np.unique(ms))
 
-
-    #ms = np.random.randint(low=0,high=2,size=(2,2))
-    ms=np.ones(shape=(2,2)).astype(bool)
+    np.random.seed(10)  
+    ms = np.random.randint(low=0,high=2,size=(30,30,30))
+    #ms=np.ones(shape=(2,2)).astype(bool)
     # ms = np.ones(shape=(2,2,2))
     # ms[0,0] = 1
     # ms[0,1] = 0
@@ -539,7 +547,7 @@ if __name__=="__main__":
 #     print(f'shape: {(ms.shape)}')
 #     print(f'ms type: {type(ms)}, size: {ms.size}')
 
-    # np.random.seed(10)
+    # 
     # ms = np.random.randin=(70,70,70))
     # print(f'ms: {ms}, size: {ms.size}')
 
@@ -568,7 +576,10 @@ if __name__=="__main__":
 ##------------------------------------------------------------------
    
     tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(phase_of_interest=[0], direction_list=[0,1], direction_mode='both')
+    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(phase_of_interest=[0], 
+                                                                               direction_list=[0,1,2], 
+                                                                               direction_mode='positive', 
+                                                                               connectivity='corners')
 
     logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
     mean_tort = singlephase_descriptor(ms)
