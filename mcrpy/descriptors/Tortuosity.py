@@ -293,7 +293,7 @@ class Tortuosity(PhaseDescriptor3D):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        direction_list : list[int] = [0], #0:x, 1:y, 2:z
+        direction_list : list[int] = [0,1,2], #0:x, 1:y, 2:z
         direction_mode:str = 'positive', # specifies in which direction the tortuosity is calculated. +#
                                          # 'positive': in direction of the direction coordinate
                                          # 'negative': in oppositve direction of the direction coordinate
@@ -410,6 +410,7 @@ class Tortuosity(PhaseDescriptor3D):
             elif method == 'SSPSM':  
                 mean_tortuosity = SSPSM(ms_phase_of_interest)
 
+            mean_tortuosity = np.array(mean_tortuosity)
             return tf.cast(tf.constant(mean_tortuosity), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
@@ -554,16 +555,6 @@ if __name__=="__main__":
 
 
 
-    # Step 2: Open the pickle file
-    # result_folder = '/home/sobczyk/Dokumente/MCRpy/mcrpy/results' 
-    # pickle_filename = os.path.join(result_folder,'BlockingLayer_X_2D_32x32_characterization.pickle')
-    # with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
-    #     # Step 3: Load the data
-    #     data = pickle.load(file)
-    # print(f"data: {data}")
-    #print(f'ms.shape: {ms.shape}')
-
-    print(f'ms: {ms}, size: {ms.size}')
     
     plotting=False
     if plotting:
@@ -584,8 +575,20 @@ if __name__=="__main__":
     logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
     mean_tort = singlephase_descriptor(ms)
     print('\n -----------------------------')
-    print(f'Mean tortuosity value: {mean_tort}')
+    print(f'tortuosity: {mean_tort}')
     logging.info(f"Standalone execution completed successfully. Result for Mean Tortuosity: {mean_tort}")
     logging.info("="*60)
 
 ##------------------------------------------------------------------
+
+    import pickle
+    # Step 2: Open the pickle file
+    result_folder = '/home/sobczyk/Dokumente/MCRpy/results' 
+    pickle_filename = os.path.join(result_folder,'BlockingLayer_X_32x32x32_characterization.pickle')
+    with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
+        # Step 3: Load the data
+        data = pickle.load(file)
+    print(f"data: {data}")
+    print(f'ms.shape: {ms.shape}')
+
+    print(f'ms: {ms}, size: {ms.size}')
