@@ -384,8 +384,8 @@ class Tortuosity(PhaseDescriptor3D):
                 # ms_phase_of_interest is an np.ndarray with bool values representing the 
                 # microstructure ms where the searched for phase is represented as True, else False.
                 # For further calculations, use ms_phase_of_interest:
-            if not ms_phase_of_interest.any():
-                return tf.cast(tf.constant(0), tf.float64)
+            # if not ms_phase_of_interest.any():
+            #     return tf.cast(tf.constant(0), tf.float64)
             
             # the following is optional: reducing the number of voxels to check by only considering cluster which 
             # go from one side to another: 
@@ -435,13 +435,13 @@ if __name__=="__main__":
     logging.getLogger('matplotlib').setLevel(logging.WARNING)
 
     import os
-    folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
+    # folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
 
     #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
 
-    #minimal_example_ms = os.path.join(result_folder,'BlockingLayer_X_2D_20x20.npy')
+    # minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
 
     # for filename in os.listdir(folder):
     #     if filename.endswith('.npy'):  # Check if the file has a .npy extension
@@ -485,21 +485,21 @@ if __name__=="__main__":
 
 
     #ms = np.random.randint(low=0,high=2,size=(2,2))
-    #ms=np.ones(shape=(2,2)).astype(bool)
-    ms = np.ones(shape=(2,2,2))
-    ms[0,0] = 1
-    ms[0,1] = 0
-    ms[1,1] = 0
-    ms[1,0] = 1
-    ms = ms.astype(bool)
-    # ms[0,0,0] = 0
-    # ms[1,1,1] = 0
-    # ms[2,2,2] = 0
-    #ms = ms.astype(int)
-    print(f'ms: {ms}')
+    ms=np.ones(shape=(2,2)).astype(bool)
+    # ms = np.ones(shape=(2,2,2))
+    # ms[0,0] = 1
+    # ms[0,1] = 0
+    # ms[1,1] = 0
+    # ms[1,0] = 1
+    # ms = ms.astype(bool)
+    # # ms[0,0,0] = 0
+    # # ms[1,1,1] = 0
+    # # ms[2,2,2] = 0
+    # #ms = ms.astype(int)
+    # print(f'ms: {ms}')
 
-    pt = Pathfinder(ms_phase_of_interest=ms,
-                    direction_list=[0,1,2], direction_mode='both')
+    # pt = Pathfinder(ms_phase_of_interest=ms,
+    #                 direction_list=[0,1,2], direction_mode='both')
     # pt.construct_adjacency_matrix()
     # pt.find_compact_source_and_target_nodes()
     # pt.calculate_distance_matrix()
@@ -507,8 +507,8 @@ if __name__=="__main__":
     # pt.compute()
 
     # print(pt.get_shortest_paths_from_distance_matrix())
-    print(f'tort: {pt.tortuosity_list}')
-    print(f'compact direction list: {pt.compact_direction_list}')
+    # print(f'tort: {pt.tortuosity_list}')
+    # print(f'compact direction list: {pt.compact_direction_list}')
     # ms = np.zeros((5,5,1))
     # ms[1,2,0] = 1
     # ms[2,1,0] = 1
@@ -541,7 +541,7 @@ if __name__=="__main__":
 
     # np.random.seed(10)
     # ms = np.random.randin=(70,70,70))
-    #print(f'ms: {ms}, size: {ms.size}')
+    # print(f'ms: {ms}, size: {ms.size}')
 
 
 
@@ -555,6 +555,7 @@ if __name__=="__main__":
     # print(f"data: {data}")
     #print(f'ms.shape: {ms.shape}')
 
+    print(f'ms: {ms}, size: {ms.size}')
     
     plotting=False
     if plotting:
@@ -567,7 +568,7 @@ if __name__=="__main__":
 ##------------------------------------------------------------------
    
     tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(direction_list=[0,1,2], direction_mode='both')
+    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(phase_of_interest=[0], direction_list=[0,1], direction_mode='both')
 
     logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
     mean_tort = singlephase_descriptor(ms)
