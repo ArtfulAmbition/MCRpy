@@ -38,7 +38,12 @@ def get_connected_phases_of_interest(labeled_ms: np.ndarray[int], direction:int=
             
             dimensionality = len(labeled_ms.shape)
             assert dimensionality in [2,3] # only 2 and 3D microstructures
-            assert direction in [0,1,2]
+            if dimensionality == 2:
+                if direction not in (0, 1):
+                    raise ValueError("direction must be 0 or 1 for 2D microstructures")
+            else:  # dimensionality == 3
+                if direction not in (0, 1, 2):
+                    raise ValueError("direction must be 0, 1 or 2 for 3D microstructures")
 
 
             # Generate the appropriate slices based on dimensionality and direction
@@ -104,7 +109,7 @@ class Percolation(PhaseDescriptor3D):
             # This is the case, if there are the same cluster labels in labeled_ms at both relevant sides
 
             # find a boolean microstructre for clusters which are connected with the relevant sides of the specified direction 
-            ms_connected_phase_of_interest, labels_at_both_surface_and_target = get_connected_phases_of_interest(ms_phase_of_interest, direction)
+            ms_connected_phase_of_interest, labels_at_both_surface_and_target = get_connected_phases_of_interest(labeled_ms, direction)
 
             n_connected_voxels:int = np.count_nonzero(ms_connected_phase_of_interest)
 
@@ -152,7 +157,7 @@ class Percolation(PhaseDescriptor3D):
             fraction_unknown_voxels = n_unknown_voxels / total_number_voxels
             fraction_voxels_without_phase_of_interest = n_voxels_not_of_interest / total_number_voxels
 
-            #print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
+            print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
 
             percolation_info_dict = {'connected': fraction_connected_voxels, 
                                 'isolated': fraction_isolated_voxels,
