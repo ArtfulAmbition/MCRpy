@@ -22,7 +22,7 @@ if disable_tf_warnings:
     import os
     os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
     os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
-    
+
 import tensorflow as tf
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
@@ -306,7 +306,7 @@ class Tortuosity(PhaseDescriptor3D):
                                          # 'positive': in direction of the direction coordinate
                                          # 'negative': in oppositve direction of the direction coordinate
                                          # 'both': calculates the tortuosity based on paths in coordinate direction and opposite
-        phase_of_interest : Union[int,list[int]] = [0], #for which phase number the tortuosity shall be calculated
+        phase_of_interest : Union[int,list[int]] = [1], #for which phase number the tortuosity shall be calculated
         voxel_dimension:tuple[float] =(1,1,1),
         **kwargs) -> callable:
 

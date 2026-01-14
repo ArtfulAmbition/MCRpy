@@ -31,6 +31,7 @@ from typing import Union, Any, Tuple
 import numpy as np
 from scipy.ndimage import label
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
+from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
 
 
 def get_connected_phases_of_interest(labeled_ms: np.ndarray[int], direction:int=0) -> np.ndarray[bool]:
@@ -77,7 +78,7 @@ def get_labeled_ms(ms_phase_of_interest: NDArray[np.bool_], connectivity='sides'
 
             return labeled_ms, n_labels
 
-class Percolation(PhaseDescriptor):
+class Percolation(PhaseDescriptor3D):
     is_differentiable = False
     tf.experimental.numpy.experimental_enable_numpy_behavior()
 
@@ -87,8 +88,8 @@ class Percolation(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        direction_list :list[int] = [0], #0:x, 1:y, 2:z
-        phase_of_interest : Union[int,list[int]] = 0, #for which phase number(s) the tortuosity shall be calculated
+        directions_list :list[int] = [0], #0:x, 1:y, 2:z
+        phase_of_interest : Union[int,list[int]] = 1, #for which phase number(s) the tortuosity shall be calculated
         **kwargs) -> callable:
 
         def calculate_percolation_single_direction(ms_phase_of_interest: NDArray[np.bool_], direction):
@@ -151,7 +152,7 @@ class Percolation(PhaseDescriptor):
             fraction_unknown_voxels = n_unknown_voxels / total_number_voxels
             fraction_voxels_without_phase_of_interest = n_voxels_not_of_interest / total_number_voxels
 
-            print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
+            #print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
 
             percolation_info_dict = {'connected': fraction_connected_voxels, 
                                 'isolated': fraction_isolated_voxels,
@@ -167,7 +168,7 @@ class Percolation(PhaseDescriptor):
             fraction_connected_voxels = [] 
             is_percolating = []
             percolation_info = []
-            for direction in direction_list:
+            for direction in directions_list:
                 fraction_connected_voxels_x , is_percolating_x, percolation_info_x = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 fraction_connected_voxels.append(fraction_connected_voxels_x)
                 is_percolating.append(is_percolating_x)
@@ -289,7 +290,7 @@ if __name__=="__main__":
 ##------------------------------------------------------------------
    
     percolation_descriptor = Percolation()
-    singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor(direction_list=[0,1,2],
+    singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor(directions_list=[0,1,2],
                                                                                 phase_of_interest=[1])
 
     fraction_connected_voxels = singlephase_descriptor(ms)
