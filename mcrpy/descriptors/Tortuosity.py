@@ -13,8 +13,16 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 """
-# from __future__ import annotations
-
+disable_tf_warnings = True
+if disable_tf_warnings:
+    # Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
+    # - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
+    #   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
+    # - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
+    import os
+    os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+    os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
+    
 import tensorflow as tf
 from mcrpy.src import descriptor_factory
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor

@@ -13,7 +13,15 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 """
-# from __future__ import annotations
+disable_tf_warnings = True
+if disable_tf_warnings:
+    # Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
+    # - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
+    #   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
+    # - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
+    import os
+    os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+    os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
 
 import tensorflow as tf
 from mcrpy.src import descriptor_factory
@@ -79,11 +87,11 @@ class Percolation(PhaseDescriptor):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        direction : int = 0, #0:x, 1:y, 2:z
+        direction_list :list[int] = [0], #0:x, 1:y, 2:z
         phase_of_interest : Union[int,list[int]] = 0, #for which phase number(s) the tortuosity shall be calculated
         **kwargs) -> callable:
 
-        def calculate_percolation(ms_phase_of_interest: NDArray[np.bool_]):
+        def calculate_percolation_single_direction(ms_phase_of_interest: NDArray[np.bool_], direction):
 
             dimensionality = len(ms_phase_of_interest.shape)
             assert dimensionality in [2,3] # only 2 and 3D microstructures
@@ -154,6 +162,20 @@ class Percolation(PhaseDescriptor):
 
             return fraction_connected_voxels, is_percolating, percolation_info_dict
             
+        def calculate_percolation_multidirection(ms_phase_of_interest: NDArray[np.bool_]):
+             
+            fraction_connected_voxels = [] 
+            is_percolating = []
+            percolation_info = []
+            for direction in direction_list:
+                fraction_connected_voxels_x , is_percolating_x, percolation_info_x = calculate_percolation_single_direction(ms_phase_of_interest, direction)
+                fraction_connected_voxels.append(fraction_connected_voxels_x)
+                is_percolating.append(is_percolating_x)
+                percolation_info.append(percolation_info_x)
+
+            return fraction_connected_voxels, is_percolating, percolation_info
+
+
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             # ms_phase_of_interest is an np.ndarray with bool values representing the 
             # microstructure ms where the searched for phase is represented as True, else False.
@@ -176,7 +198,7 @@ class Percolation(PhaseDescriptor):
 
             ms_phase_of_interest = np.isin(ms, phase_of_interest_list)
             
-            fraction_connected_voxels, is_percolating, percolation_info_dict = calculate_percolation(ms_phase_of_interest)
+            fraction_connected_voxels, is_percolating, percolation_info_dict = calculate_percolation_multidirection(ms_phase_of_interest)
 
             return tf.cast(tf.constant(fraction_connected_voxels), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
@@ -223,14 +245,14 @@ if __name__=="__main__":
     ms = np.load(minimal_example_ms)
 
 
-    ms = np.zeros((200, 200, 200))
-    ms[1,:, :] = 1
+    ms = np.zeros((5, 5,5))
+    ms[1,1,:] = 1
 
-    ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
+    #ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
 
 
 
-    # print(f'ms: {ms}')
+    print(f'ms:\n {ms}\n')
     # print(f'type: {type(ms[0])}')
     # print(f'ms type: {type(ms)}, size: {ms.size}')
     # print(f'shape: {ms.shape}')
@@ -267,7 +289,8 @@ if __name__=="__main__":
 ##------------------------------------------------------------------
    
     percolation_descriptor = Percolation()
-    singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor()
+    singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor(direction_list=[0,1,2],
+                                                                                phase_of_interest=[1])
 
     fraction_connected_voxels = singlephase_descriptor(ms)
     print('\n -----------------------------')
