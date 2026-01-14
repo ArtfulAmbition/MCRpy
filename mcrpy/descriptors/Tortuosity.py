@@ -301,7 +301,7 @@ class Tortuosity(PhaseDescriptor3D):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        direction_list : list[int] = [0,1,2], #0:x, 1:y, 2:z
+        directions_list : list[int] = [0,1,2], #0:x, 1:y, 2:z
         direction_mode:str = 'positive', # specifies in which direction the tortuosity is calculated. +#
                                          # 'positive': in direction of the direction coordinate
                                          # 'negative': in oppositve direction of the direction coordinate
@@ -313,14 +313,14 @@ class Tortuosity(PhaseDescriptor3D):
         logging.info(f'input: connectivity: {connectivity}')
         logging.info(f'input: phase_of_interest: {phase_of_interest}')
         logging.info(f'input: method: {method}')
-        logging.info(f'input: direction_list: {direction_list}')
+        logging.info(f'input: direction_list: {directions_list}')
         logging.info(f'input: voxel_dimension: {voxel_dimension}')
 
         assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
         assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
-        assert isinstance(direction_list, list)
+        assert isinstance(directions_list, list)
         assert all(isinstance(dir, int) and 0 <= dir <= 2
-                   for dir in direction_list), f"All elements of direction_list must be positve integers <= 2 (0=x,1=y,2=z).)"
+                   for dir in directions_list), f"All elements of direction_list must be positve integers <= 2 (0=x,1=y,2=z).)"
         assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
         assert isinstance(voxel_dimension,tuple)
         assert all([val>0 for val in voxel_dimension]), "Only positive values for the voxel dimensions are permitted."
@@ -332,7 +332,7 @@ class Tortuosity(PhaseDescriptor3D):
             logging.info('Entering DSPSM function.')
             
             pathfinder = Pathfinder(ms_phase_of_interest=ms_phase_of_interest,
-                                    direction_list=direction_list, 
+                                    direction_list=directions_list, 
                                     direction_mode=direction_mode) 
 
             return pathfinder.tortuosity_list
@@ -407,7 +407,7 @@ class Tortuosity(PhaseDescriptor3D):
             # go from one side to another: 
             labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
             ms_connected_phase_of_interest = np.zeros_like(labeled_ms, dtype=bool)
-            for direction in direction_list:
+            for direction in directions_list:
                 ms_connected_phase_of_interest_dir, _ = get_connected_phases_of_interest(labeled_ms, direction)
                 ms_connected_phase_of_interest = ms_connected_phase_of_interest | ms_connected_phase_of_interest_dir
 
@@ -576,7 +576,7 @@ if __name__=="__main__":
    
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(phase_of_interest=[0], 
-                                                                               direction_list=[0,1,2], 
+                                                                               directions_list=[0,1,2], 
                                                                                direction_mode='positive', 
                                                                                connectivity='corners')
 
