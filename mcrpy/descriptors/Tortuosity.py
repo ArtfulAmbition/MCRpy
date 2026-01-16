@@ -384,18 +384,28 @@ class Tortuosity(PhaseDescriptor3D):
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             
             if (len(ms.shape) > 3): # if called from mcrpy (would be a 4D tensor). If an microstructure is already 2 or 3D, don't change it.
-                if ms.shape[0]==1: #if the microstructure is 2D
-                    desired_shape =tuple(ms.shape[1:-1])
-                else: #if the microstructure is 3D
-                    desired_shape =tuple(ms.shape[0:-1])
-                ms = tf.reshape(ms, desired_shape).numpy()
-            
+                # make sure ms is a numpy array
+                ms = np.asarray(ms)
+                # if the last axis encodes multi-phase or orientation (axis > 1), decode it to a scalar phase id per voxel
+                if ms.shape[-1] > 1:
+                    # collapse one-hot/multiphase encoding -> integer phase ids
+                    ms = np.argmax(ms, axis=-1)
+                    # if there's a leading batch dimension of 1, remove it
+                    if ms.shape[0] == 1:
+                        ms = ms[0]
+                else:
+                    # usual path: remove batch and channel dimensions
+                    if ms.shape[0] == 1:  # if called from mcrpy with batch dim
+                        desired_shape = tuple(ms.shape[1:-1])
+                    else:  # already a plain 3D array with channels at the end
+                        desired_shape = tuple(ms.shape[0:-1])
+                    ms = tf.reshape(ms, desired_shape).numpy()
+
             if isinstance(phase_of_interest, int):
                 phase_of_interest_list = [phase_of_interest]
             else:
                 assert all(isinstance(item, int) for item in phase_of_interest), "type error: phase_of_interest must be an integer or a list of integers"
-                phase_of_interest_list = phase_of_interest
-            
+                phase_of_interest_list = phase_of_interest            
             ms_phase_of_interest:np.ndarray[bool] = np.isin(ms, phase_of_interest_list) 
                 # ms_phase_of_interest is an np.ndarray with bool values representing the 
                 # microstructure ms where the searched for phase is represented as True, else False.
