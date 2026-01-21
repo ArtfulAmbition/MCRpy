@@ -290,7 +290,7 @@ class Pathfinder():
             return False
         return True
 
-class Tortuosity(PhaseDescriptor):
+class Tortuosity(PhaseDescriptor3D):
     is_differentiable = False
     tf.experimental.numpy.experimental_enable_numpy_behavior()
 
