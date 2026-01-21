@@ -301,7 +301,7 @@ class Tortuosity(PhaseDescriptor3D):
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
         method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
-        directions_list : list[int] = [0,1,2], #0:x, 1:y, 2:z
+        directions_list : Union[list[int],None] = None, #0:x, 1:y, 2:z if None, calculate in all available direction
         direction_mode:str = 'positive', # specifies in which direction the tortuosity is calculated. +#
                                          # 'positive': in direction of the direction coordinate
                                          # 'negative': in oppositve direction of the direction coordinate
@@ -313,31 +313,30 @@ class Tortuosity(PhaseDescriptor3D):
         logging.info(f'input: connectivity: {connectivity}')
         logging.info(f'input: phase_of_interest: {phase_of_interest}')
         logging.info(f'input: method: {method}')
-        logging.info(f'input: direction_list: {directions_list}')
+        logging.info(f'input: directions_list: {directions_list}')
         logging.info(f'input: voxel_dimension: {voxel_dimension}')
 
         assert connectivity.lower() in ['sides', 'edges', 'corners', 6, 18, 28, 4, 8], "Valid inputs for connectivity are ['sides', 'edges, 'corners' 4, 6, 8, 18, 26]"
         assert method.upper() in ['DSPSM', 'SSPSM'], "method must be 'DSPSM' or 'SSPSM'."
-        assert isinstance(directions_list, list)
-        assert all(isinstance(dir, int) and 0 <= dir <= 2
-                   for dir in directions_list), f"All elements of direction_list must be positve integers <= 2 (0=x,1=y,2=z).)"
+        assert isinstance(directions_list, Union[list,None])
+
         assert isinstance(phase_of_interest, (int, list)), "type error: phase_of_interest must be an integer or a list of integers"
         assert isinstance(voxel_dimension,tuple)
         assert all([val>0 for val in voxel_dimension]), "Only positive values for the voxel dimensions are permitted."
         assert direction_mode in ['positive', 'negative', 'both'], "Valid inputs for direction_mode are 'positive', 'negative' or 'both'."
         
         #@tf.function
-        def DSPSM(ms_phase_of_interest: NDArray[np.bool_]):
+        def DSPSM(ms_phase_of_interest: NDArray[np.bool_], direction_list: list):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             logging.info('Entering DSPSM function.')
             
             pathfinder = Pathfinder(ms_phase_of_interest=ms_phase_of_interest,
-                                    direction_list=directions_list, 
+                                    direction_list=direction_list, 
                                     direction_mode=direction_mode) 
 
             return pathfinder.tortuosity_list
         
-        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], plotting:bool=False, method='skeletonize'):
+        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], direction_list: list, plotting:bool=False, method='skeletonize', ):
             '''
             Skeleton Shortest Path Searching Method
             '''     
@@ -378,7 +377,7 @@ class Tortuosity(PhaseDescriptor3D):
             else:
                 raise NotImplementedError('Error: Method {method} not implemented in SSPSM.')
 
-            return DSPSM(skeleton_ms) # calculate the tortuosity based on the skeleton of the ms 
+            return DSPSM(skeleton_ms, direction_list) # calculate the tortuosity based on the skeleton of the ms 
 
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
@@ -410,23 +409,31 @@ class Tortuosity(PhaseDescriptor3D):
                 # ms_phase_of_interest is an np.ndarray with bool values representing the 
                 # microstructure ms where the searched for phase is represented as True, else False.
                 # For further calculations, use ms_phase_of_interest:
-            # if not ms_phase_of_interest.any():
-            #     return tf.cast(tf.constant(0), tf.float64)
             
             # the following is optional: reducing the number of voxels to check by only considering cluster which 
             # go from one side to another: 
             labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
             ms_connected_phase_of_interest = np.zeros_like(labeled_ms, dtype=bool)
-            for direction in directions_list:
+           
+            dimensionality = len(ms.shape)      
+
+            if directions_list is None:
+                directions = [dir for dir in range(dimensionality)] 
+            else:
+                directions = directions_list
+            assert all(isinstance(dir, int) and 0 <= dir <= dimensionality-1
+                   for dir in directions), f"All elements of direction_list must be positve integers <= {dimensionality-1} (0=x,1=y,2=z).)"
+           
+            for direction in directions:
                 ms_connected_phase_of_interest_dir, _ = get_connected_phases_of_interest(labeled_ms, direction)
                 ms_connected_phase_of_interest = ms_connected_phase_of_interest | ms_connected_phase_of_interest_dir
 
             ms_phase_of_interest = ms_connected_phase_of_interest
 
             if method == 'DSPSM':  
-                mean_tortuosity = DSPSM(ms_phase_of_interest)
+                mean_tortuosity = DSPSM(ms_phase_of_interest, direction_list=directions)
             elif method == 'SSPSM':  
-                mean_tortuosity = SSPSM(ms_phase_of_interest)
+                mean_tortuosity = SSPSM(ms_phase_of_interest, direction_list=directions)
 
             mean_tortuosity = np.array(mean_tortuosity)
             return tf.cast(tf.constant(mean_tortuosity), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
@@ -510,8 +517,8 @@ if __name__=="__main__":
     
     # print(np.unique(ms))
 
-    np.random.seed(10)  
-    ms = np.random.randint(low=0,high=2,size=(30,30,30))
+    np.random.seed(11)  
+    ms = np.random.randint(low=0,high=2,size=(3,3,3))
     #ms=np.ones(shape=(2,2)).astype(bool)
     # ms = np.ones(shape=(2,2,2))
     # ms[0,0] = 1
@@ -523,7 +530,7 @@ if __name__=="__main__":
     # # ms[1,1,1] = 0
     # # ms[2,2,2] = 0
     # #ms = ms.astype(int)
-    # print(f'ms: {ms}')
+    print(f'ms:\n {ms}')
 
     # pt = Pathfinder(ms_phase_of_interest=ms,
     #                 direction_list=[0,1,2], direction_mode='both')
@@ -586,7 +593,6 @@ if __name__=="__main__":
    
     tortuosity_descriptor = Tortuosity()
     singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(phase_of_interest=[0], 
-                                                                               directions_list=[0,1,2], 
                                                                                direction_mode='positive', 
                                                                                connectivity='corners')
 
@@ -599,14 +605,14 @@ if __name__=="__main__":
 
 ##------------------------------------------------------------------
 
-    import pickle
-    # Step 2: Open the pickle file
-    result_folder = '/home/sobczyk/Dokumente/MCRpy/results' 
-    pickle_filename = os.path.join(result_folder,'BlockingLayer_X_32x32x32_characterization.pickle')
-    with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
-        # Step 3: Load the data
-        data = pickle.load(file)
-    print(f"data: {data}")
-    print(f'ms.shape: {ms.shape}')
+    # import pickle
+    # # Step 2: Open the pickle file
+    # result_folder = '/home/sobczyk/Dokumente/MCRpy/results' 
+    # pickle_filename = os.path.join(result_folder,'BlockingLayer_X_32x32x32_characterization.pickle')
+    # with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
+    #     # Step 3: Load the data
+    #     data = pickle.load(file)
+    # print(f"data: {data}")
+    # print(f'ms.shape: {ms.shape}')
 
-    print(f'ms: {ms}, size: {ms.size}')
+    # print(f'ms: {ms}, size: {ms.size}')

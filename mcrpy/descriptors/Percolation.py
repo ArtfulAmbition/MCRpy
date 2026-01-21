@@ -93,7 +93,7 @@ class Percolation(PhaseDescriptor3D):
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        directions_list :list[int] = [0], #0:x, 1:y, 2:z
+        directions_list : Union[list[int],None] = None, #0:x, 1:y, 2:z if None, calculate in all available direction
         phase_of_interest : Union[int,list[int]] = 1, #for which phase number(s) the tortuosity shall be calculated
         **kwargs) -> callable:
 
@@ -168,12 +168,12 @@ class Percolation(PhaseDescriptor3D):
 
             return fraction_connected_voxels, is_percolating, percolation_info_dict
             
-        def calculate_percolation_multidirection(ms_phase_of_interest: NDArray[np.bool_]):
+        def calculate_percolation_multidirection(ms_phase_of_interest: NDArray[np.bool_], directions:list):
              
             fraction_connected_voxels = [] 
             is_percolating = []
             percolation_info = []
-            for direction in directions_list:
+            for direction in directions:
                 fraction_connected_voxels_x , is_percolating_x, percolation_info_x = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 fraction_connected_voxels.append(fraction_connected_voxels_x)
                 is_percolating.append(is_percolating_x)
@@ -204,7 +204,16 @@ class Percolation(PhaseDescriptor3D):
 
             ms_phase_of_interest = np.isin(ms, phase_of_interest_list)
             
-            fraction_connected_voxels, is_percolating, percolation_info_dict = calculate_percolation_multidirection(ms_phase_of_interest)
+            dimensionality = len(ms.shape)      
+            if directions_list is None:
+                directions = [dir for dir in range(dimensionality)] 
+            else:
+                directions = directions_list
+            assert all(isinstance(dir, int) and 0 <= dir <= dimensionality-1
+                   for dir in directions), f"All elements of direction_list must be positve integers <= {dimensionality-1} (0=x,1=y,2=z).)"
+           
+
+            fraction_connected_voxels, is_percolating, percolation_info_dict = calculate_percolation_multidirection(ms_phase_of_interest,directions=directions)
 
             return tf.cast(tf.constant(fraction_connected_voxels), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
@@ -251,8 +260,8 @@ if __name__=="__main__":
     ms = np.load(minimal_example_ms)
 
 
-    ms = np.zeros((5, 5,5))
-    ms[1,1,:] = 1
+    ms = np.zeros((5, 5))
+    ms[1,:] = 1
 
     #ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
 
@@ -295,8 +304,7 @@ if __name__=="__main__":
 ##------------------------------------------------------------------
    
     percolation_descriptor = Percolation()
-    singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor(directions_list=[0,1,2],
-                                                                                phase_of_interest=[1])
+    singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor()
 
     fraction_connected_voxels = singlephase_descriptor(ms)
     print('\n -----------------------------')
