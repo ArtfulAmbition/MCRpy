@@ -296,6 +296,7 @@ class Tortuosity(PhaseDescriptor3D):
 
     @staticmethod
     def make_singlephase_descriptor(
+        
         connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
@@ -326,17 +327,17 @@ class Tortuosity(PhaseDescriptor3D):
         assert direction_mode in ['positive', 'negative', 'both'], "Valid inputs for direction_mode are 'positive', 'negative' or 'both'."
         
         #@tf.function
-        def DSPSM(ms_phase_of_interest: NDArray[np.bool_], direction_list: list):
+        def DSPSM(ms_phase_of_interest: NDArray[np.bool_], directions: list):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
             logging.info('Entering DSPSM function.')
             
             pathfinder = Pathfinder(ms_phase_of_interest=ms_phase_of_interest,
-                                    direction_list=direction_list, 
+                                    direction_list=directions, 
                                     direction_mode=direction_mode) 
 
             return pathfinder.tortuosity_list
         
-        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], direction_list: list, plotting:bool=False, method='skeletonize', ):
+        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], directions: list, plotting:bool=False, method='skeletonize', ):
             '''
             Skeleton Shortest Path Searching Method
             '''     
@@ -377,7 +378,7 @@ class Tortuosity(PhaseDescriptor3D):
             else:
                 raise NotImplementedError('Error: Method {method} not implemented in SSPSM.')
 
-            return DSPSM(skeleton_ms, direction_list) # calculate the tortuosity based on the skeleton of the ms 
+            return DSPSM(skeleton_ms, directions) # calculate the tortuosity based on the skeleton of the ms 
 
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
@@ -431,9 +432,9 @@ class Tortuosity(PhaseDescriptor3D):
             ms_phase_of_interest = ms_connected_phase_of_interest
 
             if method == 'DSPSM':  
-                mean_tortuosity = DSPSM(ms_phase_of_interest, direction_list=directions)
+                mean_tortuosity = DSPSM(ms_phase_of_interest, directions=directions)
             elif method == 'SSPSM':  
-                mean_tortuosity = SSPSM(ms_phase_of_interest, direction_list=directions)
+                mean_tortuosity = SSPSM(ms_phase_of_interest, directions=directions)
 
             mean_tortuosity = np.array(mean_tortuosity)
             return tf.cast(tf.constant(mean_tortuosity), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
@@ -444,7 +445,7 @@ class Tortuosity(PhaseDescriptor3D):
         return 0
 
 def register() -> None:
-    descriptor_factory.register("Tortuosity", Tortuosity)
+    descriptor_factory.register("Tortuosity3D", Tortuosity)
 
        
 
