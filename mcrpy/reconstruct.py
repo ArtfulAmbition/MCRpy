@@ -131,6 +131,8 @@ def setup_reconstruction(descriptor_dict, desired_shape, settings, initial_micro
     # augment settings
     if 'VolumeFractions' in descriptor_dict:
         settings.volume_fractions = descriptor_dict['VolumeFractions']
+    elif 'VolumeFractions3D' in descriptor_dict:
+        settings.volume_fractions = descriptor_dict['VolumeFractions3D']
     settings.n_phases = characterization_settings.n_phases
     
     # copy settings
