@@ -243,7 +243,10 @@ class PointBrowser(object):
             self.current_slice_number = self.slices // 2
 
         self.selected.set_visible(True)
-        self.selected.set_data(self.xs[self.lastind], self.ys[self.lastind])
+        # Ensure we pass sequences (matplotlib expects sequences even for single points)
+        xval = float(self.xs[self.lastind])
+        yval = float(self.ys[self.lastind])
+        self.selected.set_data([xval], [yval])
         # if self.last_microstructure.has_orientations:
         #     if 'z_' in self.ori_views[self.n_ori_view][0] or 'rho' in self.ori_views[self.n_ori_view][0]:
         #         self.selected.set(norm=matplotlib.colors.Normalize(-1, 1), cmap='seismic')

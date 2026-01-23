@@ -248,7 +248,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
                        method='DSPSM', direction=0,
                        voxel_dimension=(1, 1, 1),
                        stop_loss_tol: float = None,
-                       seed=None, verbose=True):
+                       seed=None, verbose=False):
     # Backwards compatible wrapper for the legacy GeneticAlgorithm optimizer.
     # The module also exposes a true plugin-class `GeneticAlgorithm` at the bottom
     # that integrates with MCRpy's optimizer interface (see below).
