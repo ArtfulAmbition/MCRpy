@@ -247,7 +247,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
                        phase_of_interest=0, connectivity='sides',
                        method='DSPSM', direction=0,
                        voxel_dimension=(1, 1, 1),
-                       stop_loss_tol: float = None,
+                       tolerance: float = None,
                        seed=None, verbose=False):
     # Backwards compatible wrapper for the legacy GeneticAlgorithm optimizer.
     # The module also exposes a true plugin-class `GeneticAlgorithm` at the bottom
@@ -342,7 +342,7 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
 
 
         # Early stop if a loss threshold is provided and reached
-        if stop_loss_tol is not None and current_best <= stop_loss_tol:
+        if tolerance is not None and current_best <= tolerance:
             best_idx = int(np.argmin(F))
             Xpop = current_pop.get("X")
             stop_data['X'] = Xpop[best_idx].copy()
@@ -442,7 +442,7 @@ class GeneticAlgorithm(Optimizer):
                  callback: callable = None, 
                  seed: int = None, 
                  n_phases: int = 2, 
-                 target_loss: float = 0.0, 
+                 tolerance: float = 0.0, 
                  use_multiphase: bool = False, 
                  **kwargs):
         self.max_iter = max_iter
@@ -451,7 +451,7 @@ class GeneticAlgorithm(Optimizer):
         # Store seed properly (allow None). If provided, ensure it's an int.
         self.seed = seed
         self.n_phases = int(n_phases)
-        self.target_loss = target_loss
+        self.target_loss = tolerance
         self.use_multiphase = bool(use_multiphase)
         self.current_loss = float('inf')
         self.loss_metadata = {}
@@ -461,19 +461,24 @@ class GeneticAlgorithm(Optimizer):
     def optimize(self, ms, restart_from_niter: int = None):
         # ms: MutableMicrostructure or Microstructure object
         
+        
+        # Prefer authoritative Microstructure metadata when available
         if hasattr(ms, 'spatial_shape'):
             ms_shape = tuple(ms.spatial_shape)
-        
-        ms_array = ms.xx.numpy() if hasattr(ms, 'xx') else np.array(ms)
-        # Determine shape excluding batch and channel dims
-        # if ms_array.ndim == 5:  # (1, z, y, x, 1)
-        #     ms_shape = ms_array.shape[1:-1]
-        # elif ms_array.ndim == 4:  # (1, y, x, 1) or (z, y, x, 1)
-        #     ms_shape = ms_array.shape[1:-1]
-        # elif ms_array.ndim in {2,3}:
-        #     ms_shape = ms_array.shape
-        # else:
-        #     raise ValueError('Unexpected microstructure shape for GA optimizer')
+        else:
+            ms_array = ms.xx.numpy() if hasattr(ms, 'xx') else np.array(ms)
+            # Determine shape excluding batch and channel dims
+            if ms_array.ndim == 5:  # (1, z, y, x, channels)
+                ms_shape = ms_array.shape[1:-1]
+            elif ms_array.ndim == 4:  # (1, y, x, ch) or (z, y, x, ch)
+                if ms_array.shape[0] == 1:
+                    ms_shape = ms_array.shape[1:-1]
+                else:
+                    ms_shape = ms_array.shape[:-1]
+            elif ms_array.ndim in {2, 3}:
+                ms_shape = ms_array.shape
+            else:
+                raise ValueError('Unexpected microstructure shape for GA optimizer')
 
         # Define a pymoo Problem that uses the provided call_loss via a MutableMicrostructure wrapper
         class WrappedProblem(Problem):
@@ -492,9 +497,12 @@ class GeneticAlgorithm(Optimizer):
                 for ind in X:
                     arr = np.round(ind).astype(int).reshape(self.ms_shape)
                     try:
-                        temp_ms = MutableMicrostructure(arr)
+                        # ensure proper encoding for multi-phase integer labels
+                        use_mp = True if self.n_phases and self.n_phases > 1 else False
+                        temp_ms = MutableMicrostructure(arr, use_multiphase=use_mp, trainable=False)
                         val = float(self.call_loss(temp_ms))
-                    except Exception:
+                    except Exception as e:
+                        logging.debug(f'Error evaluating candidate: {e}')
                         val = np.inf
                     fitness.append(val)
                 out['F'] = np.array(fitness).reshape(-1,1)
@@ -527,7 +535,7 @@ class GeneticAlgorithm(Optimizer):
             Xpop = algorithm.pop.get('X')
             best_ind = np.round(Xpop[best_idx]).astype(int).reshape(ms_shape)
             # build a temporary MutableMicrostructure for the DMCR callback
-            temp_ms = MutableMicrostructure(best_ind)
+            temp_ms = MutableMicrostructure(best_ind, use_multiphase=self.use_multiphase, trainable=False)
             self.current_loss = current_best
             if current_best < best_loss_so_far[0]:
                 best_loss_so_far[0] = current_best
@@ -553,12 +561,13 @@ class GeneticAlgorithm(Optimizer):
             callback=_callback
         )
 
-        best = np.round(res.X).astype(int).reshape(ms.x.shape)
+        best = np.round(res.X).astype(int).reshape(ms_shape)
         best_loss = float(res.F[0])
         self.current_loss = best_loss
 
-        # update microstructure variable
-        ms.x.assign(np.array(best, dtype=np.float64))
+        # update microstructure variable using correct encoding
+        final_temp_ms = MutableMicrostructure(best, use_multiphase=self.use_multiphase, trainable=False)
+        ms.x.assign(final_temp_ms.x)
 
         return res.algorithm.n_gen
 
@@ -598,7 +607,7 @@ if __name__ == "__main__":
         connectivity='sides',
         method='SSPSM',
         direction=0,
-        stop_loss_tol = 1e-2,
+        tolerance = 1e-2,
         seed=42,
         verbose=True
     )

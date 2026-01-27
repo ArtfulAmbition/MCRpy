@@ -10,7 +10,7 @@ descriptor_types = ['Tortuosity3D','VolumeFractions3D']
 characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=descriptor_types,
                                                            full_3d=True,
                                                            use_multigrid_descriptor=False,
-                                                           use_multiphase=True,
+                                                           use_multiphase=False,
                                                            target_folder='results',
                                                            logging_level=logging.WARNING)
 
@@ -18,7 +18,7 @@ print("Load similar 3D microstructure ...")
 ms2D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_2D_20x20.npy")
 #ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
-ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=True)
+ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=False)
 
 ms = ms3D
 
@@ -36,7 +36,7 @@ print(f"characterization: {description3D}")
 #                                     use_multigrid_descriptor=False)
 
 reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descriptor_types,
-                                    use_multiphase=True, max_iter=20,
+                                    use_multiphase=False, max_iter=20,
                                     full_3d=True,
                                     convergence_data_steps=1, outfile_data_steps=1,
                                     optimizer_type="GeneticAlgorithm",
@@ -45,6 +45,7 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descri
                                     use_multigrid_reconstruction=False,
                                     target_folder='results',
                                     population_size=20,
+                                    tolerance=1e-5,
                                     logging_level=logging.INFO)
 
 
