@@ -35,7 +35,7 @@ print(f"characterization: {description3D}")
 #                                     use_multigrid_descriptor=False)
 
 reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descriptor_types,
-                                    use_multiphase=True, max_iter=2,
+                                    use_multiphase=True, max_iter=20,
                                     full_3d=True,
                                     convergence_data_steps=1, outfile_data_steps=1,
                                     optimizer_type="GeneticAlgorithm",
@@ -43,15 +43,18 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descri
                                     use_multigrid_descriptor=False,
                                     use_multigrid_reconstruction=False,
                                     target_folder='results',
-                                    logging_level=logging.WARNING)
+                                    population_size=20,
+                                    logging_level=logging.INFO)
+
 
 # init_ms = np.full_like(ms)
 print("="*60)
 print("Reconstruct microstructure...")
-convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (20, 20, 20), 
+convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (4, 4, 4), 
                                           settings=reconstruction_settings3D,
                                           )
 
-# view(convergence_data3D)
-
+view(convergence_data3D)
+logging.info("="*60)
+logging.shutdown() 
 # view(ms_reconstruct3D, )

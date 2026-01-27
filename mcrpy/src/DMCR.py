@@ -284,7 +284,7 @@ class DMCR:
             tf.print('Iteration', n_iter, 'of', self.max_iter, ':', l, output_stream=sys.stdout)
             self.convergence_data['scatter_data'].append((n_iter, l))
             # self.convergence_data['raw_data'].append([self.resample_microstructure(ms, zoom=self.pool_size)])
-            self.convergence_data['raw_data'].append(copy.deepcopy(self.ms))
+            self.convergence_data['raw_data'].append(copy.deepcopy(ms))
         if n_iter % self.outfile_data_steps == 0 and (
                 n_iter > 0 or self.outfile_data_steps < np.inf):
             foldername = self.save_to if self.save_to is not None else ''
