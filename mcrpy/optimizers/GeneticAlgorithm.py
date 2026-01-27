@@ -448,6 +448,7 @@ class GeneticAlgorithm(Optimizer):
         self.max_iter = max_iter
         self.population_size = population_size
         self.callback = callback
+        # Store seed properly (allow None). If provided, ensure it's an int.
         self.seed = seed
         self.n_phases = int(n_phases)
         self.target_loss = target_loss
@@ -500,6 +501,9 @@ class GeneticAlgorithm(Optimizer):
 
         problem = WrappedProblem(ms_shape=ms_shape, n_phases=self.n_phases, call_loss=self.call_loss)
 
+        # Ensure reproducible numpy-based sampling (DiverseRandomSampling uses np.random)
+        if self.seed is not None and comm.rank == 0:
+            np.random.seed(self.seed)
         algorithm = GA(
             pop_size=self.population_size,
             sampling=DiverseRandomSampling(),
