@@ -55,6 +55,15 @@ class TestTortuosity(unittest.TestCase):
         self.microstructures['Diag_3x3x3'] = ms
         np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_3x3x3.npy', self.microstructures['Diag_3x3x3'])
 
+        ms = np.ones((4,4,4))
+        ms[0,0,0] = 0
+        ms[1,1,1] = 0
+        ms[2,2,2] = 0
+        ms = ms.astype(int)
+        self.microstructures['Diag_4x4x4'] = ms
+        np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy', self.microstructures['Diag_4x4x4'])
+
+
         ms = np.zeros((5,5,1))
         ms[1,2,0] = 1
         ms[2,1,0] = 1
