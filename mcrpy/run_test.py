@@ -17,7 +17,8 @@ characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=desc
 print("Load similar 3D microstructure ...")
 ms2D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_2D_20x20.npy")
 #ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy")
-ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
+# ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
+ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=True)
 
 ms = ms3D
 
@@ -50,7 +51,7 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descri
 # init_ms = np.full_like(ms)
 print("="*60)
 print("Reconstruct microstructure...")
-convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (4, 4, 4), 
+convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (2, 2, 2), 
                                           settings=reconstruction_settings3D,
                                           )
 

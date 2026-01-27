@@ -460,16 +460,20 @@ class GeneticAlgorithm(Optimizer):
 
     def optimize(self, ms, restart_from_niter: int = None):
         # ms: MutableMicrostructure or Microstructure object
+        
+        if hasattr(ms, 'spatial_shape'):
+            ms_shape = tuple(ms.spatial_shape)
+        
         ms_array = ms.xx.numpy() if hasattr(ms, 'xx') else np.array(ms)
         # Determine shape excluding batch and channel dims
-        if ms_array.ndim == 5:  # (1, z, y, x, 1)
-            ms_shape = ms_array.shape[1:-1]
-        elif ms_array.ndim == 4:  # (1, y, x, 1) or (z, y, x, 1)
-            ms_shape = ms_array.shape[1:-1]
-        elif ms_array.ndim in {2,3}:
-            ms_shape = ms_array.shape
-        else:
-            raise ValueError('Unexpected microstructure shape for GA optimizer')
+        # if ms_array.ndim == 5:  # (1, z, y, x, 1)
+        #     ms_shape = ms_array.shape[1:-1]
+        # elif ms_array.ndim == 4:  # (1, y, x, 1) or (z, y, x, 1)
+        #     ms_shape = ms_array.shape[1:-1]
+        # elif ms_array.ndim in {2,3}:
+        #     ms_shape = ms_array.shape
+        # else:
+        #     raise ValueError('Unexpected microstructure shape for GA optimizer')
 
         # Define a pymoo Problem that uses the provided call_loss via a MutableMicrostructure wrapper
         class WrappedProblem(Problem):
