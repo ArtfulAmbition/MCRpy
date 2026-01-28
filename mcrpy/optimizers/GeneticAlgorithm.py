@@ -470,7 +470,7 @@ class GeneticAlgorithm(Optimizer):
                  callback: callable = None, 
                  loss: callable = None,
                  seed: int = None, 
-                 n_phases: int = 2, 
+                 n_phases: int = 2, # zero and one
                  tolerance: float = 0.00001,
                  use_multiphase: bool = False, 
                  mutation_rule: str = 'PM',
@@ -494,8 +494,30 @@ class GeneticAlgorithm(Optimizer):
         self.loss_metadata = {}
         self.mutation_rule = mutation_rule
 
+        self.problem = self.define_problem()
+
         assert self.reconstruction_callback is not None
         assert self.loss is not None
+
+    def define_problem(self) -> Problem:
+        
+        ms_shape = self.ms.spatial_shape
+
+        self.n_elements = np.prod(ms_shape)
+
+        xl = np.zeros(self.n_elements) # lower bound for variables in function to be evaluated
+        xu = np.full(self.n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
+
+        problem = Problem(          
+            n_var=self.n_elements, # the number of variables for optimization problem is the size of the microstructure.
+            n_obj=1, # number of objective functions to be minimized (here: only one, optimize tortuosity)
+            n_constr=0, # number of constraints
+            type_var=int, # type of variables are ints (= phase numbers)
+            xl=xl,
+            xu=xu)
+        
+        return problem
+
 
     def optimize(self, ms: MutableMicrostructure, restart_from_niter: int = None):
         """Optimization loop."""
@@ -602,39 +624,4 @@ def register() -> None:
     from mcrpy.src import optimizer_factory
     optimizer_factory.register("GeneticAlgorithm", GeneticAlgorithm)
 
-
-if __name__ == "__main__":
-    # Configure logging for standalone execution
-    import os
-    log_dir = './GA_Standalone_logs'
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, 'GA_Standalone.log')
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.INFO,
-        format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        force=True  # Override any previous basicConfig
-    )
-    logging.info("="*60)
-    mpi_logging(f'TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION')
-    logging.info("="*60)
-    # Suppress Matplotlib logging
-    #logging.getLogger('matplotlib').setLevel(logging.WARNING)
-
-    # Small smoke-test when run as script
-    result_2d = run_ga_optimization(
-        ms_shape=(10, 10),
-        n_phases=2,
-        target_tortuosity=2.05,
-        max_generations=5,
-        pop_size=60,
-        phase_of_interest=0, 
-        connectivity='sides',
-        method='SSPSM',
-        direction=0,
-        tolerance = 1e-2,
-        seed=42,
-        verbose=True
-    )
 
