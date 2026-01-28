@@ -124,10 +124,6 @@ class DMCR:
         self.full_3d = full_3d
         self.initial_microstructure = initial_microstructure
         self.minimal_resolution = minimal_resolution if minimal_resolution is not None else limit_to
-        # reconstruction tolerance (may be passed via kwargs/Settings)
-        self.tolerance = kwargs.get('tolerance', None)
-        # flag to suppress duplicate callbacks after reaching tolerance
-        self._suppress_after_tol = False
         tf.keras.backend.set_floatx("float64")
         self.kwargs = kwargs
         self.convergence_data = {
@@ -284,16 +280,6 @@ class DMCR:
     def reconstruction_callback(self, n_iter: int, loss: float, ms: Microstructure, force_save: int = False, safe_mode: bool = False):
         """Function to call every iteration for monitoring convergence and storing results. Technically not a callback function."""
         self.convergence_data['line_data'].append((n_iter, loss))
-
-        # Suppress duplicate callbacks after reaching tolerance (but allow forced saves)
-        if self.tolerance is not None and loss <= self.tolerance and not force_save:
-            if self._suppress_after_tol:
-                # Already recorded the first occurrence at/below tolerance — skip duplicate
-                return
-            else:
-                # First time we reach tolerance: mark suppression for later callbacks
-                self._suppress_after_tol = True
-
         if (n_iter % self.convergence_data_steps == 0 or force_save) and not n_iter > self.max_iter:
             tf.print('Iteration', n_iter, 'of', self.max_iter, ':', loss, output_stream=sys.stdout)
             self.convergence_data['scatter_data'].append((n_iter, loss))
@@ -342,8 +328,6 @@ class DMCR:
         return self.convergence_data, self.ms
 
     def setup_optimization(self, desired_shape, mg_levels, previous_solution, mg_level):
-        # Reset suppression flag for callbacks when starting a new optimization level
-        self._suppress_after_tol = False
         self.mg_level = mg_level
         self.pool_size = 2**mg_level
 
