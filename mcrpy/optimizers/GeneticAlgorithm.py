@@ -515,8 +515,19 @@ class GeneticAlgorithm(Optimizer):
         else:
             logging.info('reached number of iterations')
         return self.n_iter
+    
+    def _mutate(self):
+        pass
 
     def step(self):
+        self._mutate()
+        new_loss = self.call_loss(self.ms)
+        loss_amelioration = self.current_loss - new_loss
+        if loss_amelioration > 0 :
+            self.iters_since_last_accept = 0
+            self.current_loss = new_loss
+        else:
+            self.iters_since_last_accept += 1
         self.n_iter += 1
         self.reconstruction_callback(self.n_iter, self.current_loss, self.ms)
         return
@@ -584,6 +595,7 @@ class GeneticAlgorithm(Optimizer):
         self.ms.x.assign(final_temp_ms.x)
 
         return res.algorithm.n_gen
+
 
 
 def register() -> None:
