@@ -9,10 +9,11 @@ limit_to = 8 # maximale Laenge des Vektors in x oder y-Richtung
 descriptor_types = ['Tortuosity3D','VolumeFractions3D']
 characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=descriptor_types,
                                                            full_3d=True,
-                                                           use_multigrid_descriptor=False,
+                                                           use_multigrid_descriptor=True,
                                                            use_multiphase=False,
                                                            target_folder='results',
-                                                           logging_level=logging.WARNING)
+                                                           logging_level=logging.WARNING,
+                                                           limit_to=2)
 
 print("Load similar 3D microstructure ...")
 ms2D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_2D_20x20.npy")
@@ -41,12 +42,12 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descri
                                     full_3d=True,
                                     convergence_data_steps=1, outfile_data_steps=1,
                                     optimizer_type="GeneticAlgorithm",
-                                    #mutation_rule="relaxed_neighbor",
-                                    use_multigrid_descriptor=False,
-                                    use_multigrid_reconstruction=False,
+                                    use_multigrid_descriptor=True,
+                                    use_multigrid_reconstruction=True,
                                     target_folder='results',
                                     population_size=200,
                                     tolerance=1e-5,
+                                    limit_to=2,
                                     logging_level=logging.INFO)
 
 
