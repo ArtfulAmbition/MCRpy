@@ -242,6 +242,33 @@ class MicrostructureOptimizationProblem(Problem):
         out["F"] = fitness
 
 
+class WrappedProblem(Problem):
+    def __init__(self, ms_shape, n_phases, call_loss):
+        n_var = int(np.prod(ms_shape))
+        xl = np.zeros(n_var)
+        xu = np.full(n_var, n_phases - 1)
+        super().__init__(n_var=n_var, n_obj=1, n_constr=0, type_var=int, xl=xl, xu=xu)
+        self.ms_shape = ms_shape
+        self.n_phases = int(n_phases)
+        self.call_loss = call_loss
+
+    def _evaluate(self, X, out, *args, **kwargs):
+        # X: (pop_size, n_var)
+        fitness = []
+        for ind in X:
+            arr = np.round(ind).astype(int).reshape(self.ms_shape)
+            try:
+                # ensure proper encoding for multi-phase integer labels
+                use_mp = True if self.n_phases and self.n_phases > 1 else False
+                temp_ms = MutableMicrostructure(arr, use_multiphase=use_mp, trainable=False)
+                val = float(self.call_loss(temp_ms))
+            except Exception as e:
+                logging.debug(f'Error evaluating candidate: {e}')
+                val = np.inf
+            fitness.append(val)
+        out['F'] = np.array(fitness).reshape(-1,1)
+
+
 def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
                        max_generations=1000, pop_size=150,
                        phase_of_interest=0, connectivity='sides',
@@ -439,77 +466,63 @@ class GeneticAlgorithm(Optimizer):
     def __init__(self, 
                  max_iter: int = 100, 
                  population_size: int = 50, 
+                 conv_iter: int = 500,
                  callback: callable = None, 
+                 loss: callable = None,
                  seed: int = None, 
                  n_phases: int = 2, 
-                 tolerance: float = 0.0, 
+                 tolerance: float = 0.00001,
                  use_multiphase: bool = False, 
+                 mutation_rule: str = 'PM',
+                 use_orientations: bool = False,
+                 is_3D: bool = False,
                  **kwargs):
+        if use_orientations:
+            raise ValueError('This optimizer_type cannot solve for orientations.')
         self.max_iter = max_iter
+        self.conv_iter = conv_iter #number of allowed iterations without improvement
+        self.is_3D = is_3D
         self.population_size = population_size
-        self.callback = callback
-        # Store seed properly (allow None). If provided, ensure it's an int.
+        self.reconstruction_callback = callback
         self.seed = seed
         self.n_phases = int(n_phases)
         self.target_loss = tolerance
         self.use_multiphase = bool(use_multiphase)
-        self.current_loss = float('inf')
+        self.loss = loss
+        self.tolerance = tolerance
+        self.current_loss = np.inf
         self.loss_metadata = {}
+        self.mutation_rule = mutation_rule
 
-        # call_loss will be set later via Optimizer.set_call_loss
+        assert self.reconstruction_callback is not None
+        assert self.loss is not None
 
-    def optimize(self, ms, restart_from_niter: int = None):
-        # ms: MutableMicrostructure or Microstructure object
-        
-        
-        # Prefer authoritative Microstructure metadata when available
-        if hasattr(ms, 'spatial_shape'):
-            ms_shape = tuple(ms.spatial_shape)
+    def optimize(self, ms: MutableMicrostructure, restart_from_niter: int = None):
+        """Optimization loop."""
+        self.n_iter = 0 if restart_from_niter is None else restart_from_niter
+        self.iters_since_last_accept = 0
+        self.ms = ms
+        self.current_loss = self.call_loss(self.ms)
+
+        while self.n_iter < self.max_iter:
+            if self.iters_since_last_accept >= self.conv_iter:
+                logging.info('converged - no change since {self.iters_since_last_accept} iterations')
+                break
+            if self.current_loss <= self.tolerance:
+                logging.info('reached tolerance')
+                break
+            self.step()
         else:
-            ms_array = ms.xx.numpy() if hasattr(ms, 'xx') else np.array(ms)
-            # Determine shape excluding batch and channel dims
-            if ms_array.ndim == 5:  # (1, z, y, x, channels)
-                ms_shape = ms_array.shape[1:-1]
-            elif ms_array.ndim == 4:  # (1, y, x, ch) or (z, y, x, ch)
-                if ms_array.shape[0] == 1:
-                    ms_shape = ms_array.shape[1:-1]
-                else:
-                    ms_shape = ms_array.shape[:-1]
-            elif ms_array.ndim in {2, 3}:
-                ms_shape = ms_array.shape
-            else:
-                raise ValueError('Unexpected microstructure shape for GA optimizer')
+            logging.info('reached number of iterations')
+        return self.n_iter
 
-        # Define a pymoo Problem that uses the provided call_loss via a MutableMicrostructure wrapper
-        class WrappedProblem(Problem):
-            def __init__(self, ms_shape, n_phases, call_loss):
-                n_var = int(np.prod(ms_shape))
-                xl = np.zeros(n_var)
-                xu = np.full(n_var, n_phases - 1)
-                super().__init__(n_var=n_var, n_obj=1, n_constr=0, type_var=int, xl=xl, xu=xu)
-                self.ms_shape = ms_shape
-                self.n_phases = int(n_phases)
-                self.call_loss = call_loss
+    def step(self):
+        self.n_iter += 1
+        self.reconstruction_callback(self.n_iter, self.current_loss, self.ms)
+        return
 
-            def _evaluate(self, X, out, *args, **kwargs):
-                # X: (pop_size, n_var)
-                fitness = []
-                for ind in X:
-                    arr = np.round(ind).astype(int).reshape(self.ms_shape)
-                    try:
-                        # ensure proper encoding for multi-phase integer labels
-                        use_mp = True if self.n_phases and self.n_phases > 1 else False
-                        temp_ms = MutableMicrostructure(arr, use_multiphase=use_mp, trainable=False)
-                        val = float(self.call_loss(temp_ms))
-                    except Exception as e:
-                        logging.debug(f'Error evaluating candidate: {e}')
-                        val = np.inf
-                    fitness.append(val)
-                out['F'] = np.array(fitness).reshape(-1,1)
-
-        # Create problem and algorithm
-        if not hasattr(self, 'call_loss') or not callable(self.call_loss):
-            raise AssertionError('GA optimizer requires call_loss to be set (use set_call_loss)')
+        if hasattr(self.ms, 'spatial_shape'):
+            ms_shape = tuple(self.ms.spatial_shape)
 
         problem = WrappedProblem(ms_shape=ms_shape, n_phases=self.n_phases, call_loss=self.call_loss)
 
@@ -528,6 +541,7 @@ class GeneticAlgorithm(Optimizer):
         best_loss_so_far = [float('inf')]
 
         def _callback(algorithm):
+            return 0
             F = algorithm.pop.get('F')
             current_best = float(np.min(F))
             # get best individual
@@ -540,13 +554,13 @@ class GeneticAlgorithm(Optimizer):
             if current_best < best_loss_so_far[0]:
                 best_loss_so_far[0] = current_best
             # Call DMCR-style callback: (n_iter, loss, ms)
-            if self.callback:
+            if self.reconstruction_callback and rank == 0:
                 try:
-                    self.callback(algorithm.n_gen, current_best, temp_ms)
+                    self.reconstruction_callback(algorithm.n_gen, current_best, temp_ms)
                 except TypeError:
                     # backward compatibility: try calling with only generation number
                     try:
-                        self.callback(algorithm.n_gen)
+                        self.reconstruction_callback(algorithm.n_gen)
                     except Exception:
                         pass
             if self.target_loss and current_best <= self.target_loss:
@@ -567,7 +581,7 @@ class GeneticAlgorithm(Optimizer):
 
         # update microstructure variable using correct encoding
         final_temp_ms = MutableMicrostructure(best, use_multiphase=self.use_multiphase, trainable=False)
-        ms.x.assign(final_temp_ms.x)
+        self.ms.x.assign(final_temp_ms.x)
 
         return res.algorithm.n_gen
 
