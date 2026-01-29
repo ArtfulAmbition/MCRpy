@@ -29,11 +29,16 @@ from pymoo.operators.mutation.bitflip import BitflipMutation
 from pymoo.core.mutation import Mutation
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.core.sampling import Sampling
+from pymoo.core.termination import NoTermination
 from pymoo.operators.repair.rounding import RoundingRepair
 from pymoo.operators.sampling.rnd import IntegerRandomSampling
 import logging
 import warnings
 from mcrpy.descriptors.Tortuosity import Tortuosity
+from mcrpy.optimizers.Optimizer import Optimizer
+from mcrpy.src import optimizer_factory
+from mcrpy.src.MutableMicrostructure import MutableMicrostructure
+
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -440,16 +445,6 @@ def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
     }
 
 
-# ============================================================================
-# EXAMPLE USAGE
-# ============================================================================
-
-# Provide a small MCRpy-Optimizer wrapper so this module can be used as an optimizer plugin
-# within the MCRpy reconstruction pipeline (DMCR).
-from mcrpy.optimizers.Optimizer import Optimizer
-from mcrpy.src import optimizer_factory
-from mcrpy.src.MutableMicrostructure import MutableMicrostructure
-
 class GeneticAlgorithm(Optimizer):
     """MCRpy optimizer adapter wrapping pymoo-based GA runs.
 
@@ -494,30 +489,63 @@ class GeneticAlgorithm(Optimizer):
         self.loss_metadata = {}
         self.mutation_rule = mutation_rule
 
-        self.problem = self.define_problem()
+        # pymoo specific objects:
+        self.problem = None
+        self.sampling = None
+        self.algorithm = None
+        self.crossover = None
+        self.mutation = None
 
-        assert self.reconstruction_callback is not None
-        assert self.loss is not None
+        self.set_up_pymoo() #setting up the genetic algorithm using pymoo library
 
-    def define_problem(self) -> Problem:
-        
+    def set_up_pymoo(self):
+
         ms_shape = self.ms.spatial_shape
+        n_elements = np.prod(ms_shape) #number of elements of each individual
+        xl = np.zeros(n_elements) # lower bound for variables in function to be evaluated
+        xu = np.full(n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
 
-        self.n_elements = np.prod(ms_shape)
-
-        xl = np.zeros(self.n_elements) # lower bound for variables in function to be evaluated
-        xu = np.full(self.n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
-
-        problem = Problem(          
-            n_var=self.n_elements, # the number of variables for optimization problem is the size of the microstructure.
-            n_obj=1, # number of objective functions to be minimized (here: only one, optimize tortuosity)
+        self.problem = Problem(          
+            n_var=n_elements, # the number of variables for optimization problem is the size of the microstructure.
+            n_obj=1, # number of objective functions to be minimized 
             n_constr=0, # number of constraints
-            type_var=int, # type of variables are ints (= phase numbers)
+            type_var=int, # type of variables are ints
             xl=xl,
             xu=xu)
-        
-        return problem
 
+        self.sampling=DiverseRandomSampling()
+        self.crossover = SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair())
+        self.mutation = PM(prob=0.5, eta=1,vtype=float, repair=RoundingRepair())
+
+        self.algorithm = GA(
+                pop_size=self.population_size,
+                sampling=self.sampling,
+                crossover=self.crossover,
+                # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
+                #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases), #seems to work well for very small examples
+                mutation=self.mutation,
+                eliminate_duplicates=True
+                )
+        
+        # prepare the algorithm to solve the specific problem (same arguments as for the minimize function)
+        self.algorithm.setup(self.problem, termination=NoTermination(), verbose=False)
+
+        
+        def pymoo_callback(self):
+            current_population = self.algorithm.pop
+            F = current_population.get("F")
+            current_best = float(np.min(F))
+
+            # Early stop if a loss threshold is provided and reached
+            if tolerance is not None and current_best <= tolerance:
+                best_idx = int(np.argmin(F))
+                Xpop = current_population.get("X")
+                stop_data['X'] = Xpop[best_idx].copy()
+                stop_data['F'] = float(F[best_idx])
+                stop_data['n_gen'] = int(self.algorithm.n_gen)
+                raise StopIteration("early stop: loss below threshold")
+        
+        self.pymoo_callback = pymoo_callback()
 
     def optimize(self, ms: MutableMicrostructure, restart_from_niter: int = None):
         """Optimization loop."""
@@ -537,12 +565,16 @@ class GeneticAlgorithm(Optimizer):
         else:
             logging.info('reached number of iterations')
         return self.n_iter
-    
-    def _mutate(self):
-        pass
 
     def step(self):
-        self._mutate()
+
+        self.algorithm.next() # evaluate the next generation
+        result = self.algorithm.result() # ask to get the the next generation 
+        loss_vals = result.F
+        current_best_loss = float(np.min(loss_vals))
+        
+        print(result.F)
+    
         new_loss = self.call_loss(self.ms)
         loss_amelioration = self.current_loss - new_loss
         if loss_amelioration > 0 :
@@ -554,71 +586,8 @@ class GeneticAlgorithm(Optimizer):
         self.reconstruction_callback(self.n_iter, self.current_loss, self.ms)
         return
 
-        if hasattr(self.ms, 'spatial_shape'):
-            ms_shape = tuple(self.ms.spatial_shape)
-
-        problem = WrappedProblem(ms_shape=ms_shape, n_phases=self.n_phases, call_loss=self.call_loss)
-
-        # Ensure reproducible numpy-based sampling (DiverseRandomSampling uses np.random)
-        if self.seed is not None and comm.rank == 0:
-            np.random.seed(self.seed)
-        algorithm = GA(
-            pop_size=self.population_size,
-            sampling=DiverseRandomSampling(),
-            crossover=SBX(prob=0.9, eta=15, vtype=float, repair=RoundingRepair()),
-            mutation=PM(prob=0.5, eta=1, vtype=float, repair=RoundingRepair()),
-            eliminate_duplicates=True,
-            seed=self.seed
-        )
-
-        best_loss_so_far = [float('inf')]
-
-        def _callback(algorithm):
-            return 0
-            F = algorithm.pop.get('F')
-            current_best = float(np.min(F))
-            # get best individual
-            best_idx = int(np.argmin(F))
-            Xpop = algorithm.pop.get('X')
-            best_ind = np.round(Xpop[best_idx]).astype(int).reshape(ms_shape)
-            # build a temporary MutableMicrostructure for the DMCR callback
-            temp_ms = MutableMicrostructure(best_ind, use_multiphase=self.use_multiphase, trainable=False)
-            self.current_loss = current_best
-            if current_best < best_loss_so_far[0]:
-                best_loss_so_far[0] = current_best
-            # Call DMCR-style callback: (n_iter, loss, ms)
-            if self.reconstruction_callback and rank == 0:
-                try:
-                    self.reconstruction_callback(algorithm.n_gen, current_best, temp_ms)
-                except TypeError:
-                    # backward compatibility: try calling with only generation number
-                    try:
-                        self.reconstruction_callback(algorithm.n_gen)
-                    except Exception:
-                        pass
-            if self.target_loss and current_best <= self.target_loss:
-                algorithm.termination.force_termination = True
-
-        res = minimize(
-            problem,
-            algorithm,
-            ('n_gen', self.max_iter),
-            seed=self.seed,
-            verbose=False,
-            callback=_callback
-        )
-
-        best = np.round(res.X).astype(int).reshape(ms_shape)
-        best_loss = float(res.F[0])
-        self.current_loss = best_loss
-
-        # update microstructure variable using correct encoding
-        final_temp_ms = MutableMicrostructure(best, use_multiphase=self.use_multiphase, trainable=False)
-        self.ms.x.assign(final_temp_ms.x)
-
-        return res.algorithm.n_gen
-
-
+    def _mutate(self):
+        pass
 
 def register() -> None:
     from mcrpy.src import optimizer_factory
