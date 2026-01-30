@@ -299,10 +299,10 @@ class DMCR:
             # self.convergence_data['raw_data'].append([self.resample_microstructure(ms, zoom=self.pool_size)])
             self.convergence_data['raw_data'].append(copy.deepcopy(ms))
 
-            # characterization = mcrpy.characterize(ms, char_settings)
-            # tort = characterization.get('Tortuosity3D')
-            # vf = characterization.get('VolumeFractions3D')
-            # print(f'Characterization: Tortuosity3D = {tort}, VolumeFractions3D = {vf}')
+            characterization = mcrpy.characterize(ms, char_settings)
+            tort = characterization.get('Tortuosity3D')
+            vf = characterization.get('VolumeFractions3D')
+            print(f'Characterization: Tortuosity3D = {tort}, VolumeFractions3D = {vf}')
 
         if n_iter % self.outfile_data_steps == 0 and (
                 n_iter > 0 or self.outfile_data_steps < np.inf):
