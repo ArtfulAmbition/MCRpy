@@ -8,10 +8,12 @@ import logging
 use_multigrid = False
 
 limit_to = 8 # maximale Laenge des Vektors in x oder y-Richtung
-descriptor_types = ['Tortuosity3D','VolumeFractions3D']
+descriptor_types = ['VolumeFractions3D']
+# descriptor_types = ['Tortuosity3D','VolumeFractions3D']
+
 characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=descriptor_types,
                                                            full_3d=True,
-                                                           limit_to=2,
+                                                           limit_to=limit_to,
                                                            use_multigrid_descriptor=use_multigrid,
                                                            use_multiphase=False,
                                                            target_folder='results',
@@ -43,21 +45,21 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descri
                                     use_multiphase=False, 
                                     max_iter=10,
                                     full_3d=True,
-                                    limit_to=2,
+                                    limit_to=limit_to,
                                     convergence_data_steps=1, outfile_data_steps=1,
-                                    #optimizer_type="GeneticAlgorithm",
-                                    optimizer_type="SimulatedAnnealing",
+                                    optimizer_type="GeneticAlgorithm",
+                                    #optimizer_type="SimulatedAnnealing",
                                     use_multigrid_descriptor=use_multigrid,
                                     use_multigrid_reconstruction=use_multigrid,
                                     target_folder='results',
-                                    population_size=20,
+                                    population_size=3,
                                     tolerance=1e-5,
                                     logging_level=logging.INFO)
 
 
 print("="*60)
 print("Reconstruct microstructure...")
-convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (8, 8, 8), 
+convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (200, 200, 200), 
                                           settings=reconstruction_settings3D,
                                           )
 
