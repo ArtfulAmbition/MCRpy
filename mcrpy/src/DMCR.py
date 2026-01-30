@@ -280,6 +280,7 @@ class DMCR:
     def reconstruction_callback(self, n_iter: int, loss: float, ms: Microstructure, force_save: int = False, safe_mode: bool = False):
         """Function to call every iteration for monitoring convergence and storing results. Technically not a callback function."""
         self.convergence_data['line_data'].append((n_iter, loss))
+        
         if (n_iter % self.convergence_data_steps == 0 or force_save) and not n_iter > self.max_iter:
             tf.print('Iteration', n_iter, 'of', self.max_iter, ':', loss, output_stream=sys.stdout)
             self.convergence_data['scatter_data'].append((n_iter, loss))
