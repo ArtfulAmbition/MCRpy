@@ -280,12 +280,30 @@ class DMCR:
     def reconstruction_callback(self, n_iter: int, loss: float, ms: Microstructure, force_save: int = False, safe_mode: bool = False):
         """Function to call every iteration for monitoring convergence and storing results. Technically not a callback function."""
         self.convergence_data['line_data'].append((n_iter, loss))
-        
+                    
+        import mcrpy
+        from mcrpy.src.Settings import CharacterizationSettings
+        char_settings = CharacterizationSettings(
+            descriptor_types=self.descriptor_types,
+            full_3d=self.full_3d,
+            use_multigrid_descriptor=self.use_multigrid_descriptor,
+            use_multiphase=self.use_multiphase,
+            target_folder=self.save_to,
+            logging_level=logging.INFO,
+        )
+
+
         if (n_iter % self.convergence_data_steps == 0 or force_save) and not n_iter > self.max_iter:
             tf.print('Iteration', n_iter, 'of', self.max_iter, ':', loss, output_stream=sys.stdout)
             self.convergence_data['scatter_data'].append((n_iter, loss))
             # self.convergence_data['raw_data'].append([self.resample_microstructure(ms, zoom=self.pool_size)])
             self.convergence_data['raw_data'].append(copy.deepcopy(ms))
+
+            # characterization = mcrpy.characterize(ms, char_settings)
+            # tort = characterization.get('Tortuosity3D')
+            # vf = characterization.get('VolumeFractions3D')
+            # print(f'Characterization: Tortuosity3D = {tort}, VolumeFractions3D = {vf}')
+
         if n_iter % self.outfile_data_steps == 0 and (
                 n_iter > 0 or self.outfile_data_steps < np.inf):
             foldername = self.save_to if self.save_to is not None else ''

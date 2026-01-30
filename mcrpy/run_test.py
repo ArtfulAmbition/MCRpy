@@ -9,7 +9,8 @@ limit_to = 8 # maximale Laenge des Vektors in x oder y-Richtung
 descriptor_types = ['Tortuosity3D','VolumeFractions3D']
 characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=descriptor_types,
                                                            full_3d=True,
-                                                           use_multigrid_descriptor=False,
+                                                           limit_to=2,
+                                                           use_multigrid_descriptor=True,
                                                            use_multiphase=False,
                                                            target_folder='results',
                                                            logging_level=logging.WARNING)
@@ -37,12 +38,13 @@ print(f"characterization: {description3D}")
 #                                     use_multigrid_descriptor=False)
 
 reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descriptor_types,
-                                    use_multiphase=False, max_iter=30,
+                                    use_multiphase=False, max_iter=10,
                                     full_3d=True,
+                                    limit_to=2,
                                     convergence_data_steps=1, outfile_data_steps=1,
                                     optimizer_type="GeneticAlgorithm",
-                                    use_multigrid_descriptor=False,
-                                    use_multigrid_reconstruction=False,
+                                    use_multigrid_descriptor=True,
+                                    use_multigrid_reconstruction=True,
                                     target_folder='results',
                                     population_size=500,
                                     tolerance=1e-5,
