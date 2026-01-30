@@ -1,16 +1,3 @@
-"""
-Minimalistic Genetic Algorithm for Microstructure Tortuosity Optimization
-
-This script finds microstructures with prescribed tortuosity using a genetic algorithm.
-Uses the Tortuosity descriptor from MCRpy.
-
-Supports:
-  - 2D and 3D microstructures
-  - Any number of phases (0 to n_phases)
-  - Flexible shape prescription
-  - Customizable connectivity and method (DSPSM/SSPSM)
-"""
-
 
 import os
 # Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
@@ -25,20 +12,14 @@ from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
-from pymoo.operators.mutation.bitflip import BitflipMutation 
 from pymoo.core.mutation import Mutation
-from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.core.sampling import Sampling
 from pymoo.core.termination import NoTermination
 from pymoo.operators.repair.rounding import RoundingRepair
-from pymoo.operators.sampling.rnd import IntegerRandomSampling
+from mcrpy.optimizers.Optimizer import Optimizer
+from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 import logging
 import warnings
-from mcrpy.descriptors.Tortuosity import Tortuosity
-from mcrpy.optimizers.Optimizer import Optimizer
-from mcrpy.src import optimizer_factory
-from mcrpy.src.MutableMicrostructure import MutableMicrostructure
-
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -164,287 +145,6 @@ class PhaseBitflip(Mutation):
 
         return X
 
-
-class MicrostructureOptimizationProblem(Problem):
-    """Genetic Algorithm Problem: Find microstructure with target tortuosity"""
-    
-    def __init__(self, ms_shape, n_phases, target_tortuosity, 
-                 phase_of_interest=0, connectivity='sides', method='DSPSM',
-                 direction=0, voxel_dimension=(1, 1, 1)):
-        """
-        Args:
-            ms_shape: Shape of microstructure (tuple: (ny, nx) for 2D or (nz, ny, nx) for 3D)
-            n_phases: Number of phases (integer phases 0 to n_phases-1)
-            target_tortuosity: Target tortuosity value
-            phase_of_interest: Phase to analyze for tortuosity (default 0)
-            connectivity: Connectivity type ('sides', 'edges', 'corners')
-            method: Tortuosity method ('DSPSM' or 'SSPSM')
-            direction: Direction of tortuosity analysis (0=x, 1=y, 2=z)
-            voxel_dimension: Voxel size tuple
-        """
-        self.ms_shape = ms_shape
-        self.n_elements = np.prod(ms_shape)
-        self.n_phases = n_phases
-        self.target_tortuosity = target_tortuosity
-        self.phase_of_interest = phase_of_interest
-        
-        # Create tortuosity descriptor
-        self.descriptor = Tortuosity.make_singlephase_descriptor(
-            connectivity=connectivity,
-            method=method,
-            direction=direction,
-            phase_of_interest=phase_of_interest,
-            voxel_dimension=voxel_dimension
-        )
-        
-        self.eval_count = 0
-        
-        # Create bounds arrays for each variable
-        xl = np.zeros(self.n_elements) # lower bound for variables in function to be evaluated
-        xu = np.full(self.n_elements, n_phases - 1) # upper bound for variables in function to be evaluated
-        
-        super().__init__(
-            n_var=self.n_elements, # the number of variables for optimization problem is the size of the microstructure.
-            n_obj=1, # number of objective functions to be minimized (here: only one, optimize tortuosity)
-            n_constr=0, # number of constraints
-            type_var=int, # type of variables are ints (= phase numbers)
-            xl=xl,
-            xu=xu
-        )
-    
-    def _evaluate(self, x, out, *args, **kwargs):
-        """Evaluate fitness for population x using MPI parallelization."""
-           
-        # print(f'rank {rank}: x in evaluate:\n {x}')
-
-        # Split the population across MPI ranks
-        chunks = np.array_split(x, mpi_size)
-        local_chunk = chunks[rank]
-        # print(f'rank {rank}: local_chunk:\n {local_chunk}')
-        
-        local_fitness = np.zeros(len(local_chunk))
-        for i, individual in enumerate(local_chunk):
-            # Reshape to microstructure
-            ms = individual.reshape(self.ms_shape).astype(int)
-            
-            # Compute tortuosity using MCRpy descriptor
-            try:
-                current_tort = float(self.descriptor(ms))
-            except Exception as e:
-                raise Exception('error in evaluation of tortuosity')
-            
-            # Loss: absolute difference from target
-            loss = np.abs(current_tort - self.target_tortuosity)
-            local_fitness[i] = loss
-            self.eval_count += 1
-        
-        # Gather fitness from all ranks
-        #print(f'process rank {rank} evalutated local fitness {local_fitness}.')
-        all_fitness = comm.allgather(local_fitness)
-        fitness = np.concatenate(all_fitness)
-        #mpi_logging(f'process rank {rank} evalutated total fitness {fitness}.')
-        
-        out["F"] = fitness
-
-
-class WrappedProblem(Problem):
-    def __init__(self, ms_shape, n_phases, call_loss):
-        n_var = int(np.prod(ms_shape))
-        xl = np.zeros(n_var)
-        xu = np.full(n_var, n_phases - 1)
-        super().__init__(n_var=n_var, n_obj=1, n_constr=0, type_var=int, xl=xl, xu=xu)
-        self.ms_shape = ms_shape
-        self.n_phases = int(n_phases)
-        self.call_loss = call_loss
-
-    def _evaluate(self, X, out, *args, **kwargs):
-        # X: (pop_size, n_var)
-        fitness = []
-        for ind in X:
-            arr = np.round(ind).astype(int).reshape(self.ms_shape)
-            try:
-                # ensure proper encoding for multi-phase integer labels
-                use_mp = True if self.n_phases and self.n_phases > 1 else False
-                temp_ms = MutableMicrostructure(arr, use_multiphase=use_mp, trainable=False)
-                val = float(self.call_loss(temp_ms))
-            except Exception as e:
-                logging.debug(f'Error evaluating candidate: {e}')
-                val = np.inf
-            fitness.append(val)
-        out['F'] = np.array(fitness).reshape(-1,1)
-
-
-def run_ga_optimization(ms_shape, n_phases, target_tortuosity,
-                       max_generations=1000, pop_size=150,
-                       phase_of_interest=0, connectivity='sides',
-                       method='DSPSM', direction=0,
-                       voxel_dimension=(1, 1, 1),
-                       tolerance: float = None,
-                       seed=None, verbose=False):
-    # Backwards compatible wrapper for the legacy GeneticAlgorithm optimizer.
-    # The module also exposes a true plugin-class `GeneticAlgorithm` at the bottom
-    # that integrates with MCRpy's optimizer interface (see below).
-    """
-    Run genetic algorithm to optimize microstructure tortuosity
-    
-    Args:
-        ms_shape: Shape of microstructure ((ny, nx) for 2D or (nz, ny, nx) for 3D)
-        n_phases: Number of phases (integer phases 0 to n_phases-1)
-        target_tortuosity: Target tortuosity value
-        max_generations: Maximum GA generations
-        pop_size: Population size
-        phase_of_interest: Phase ID to optimize for (default 0)
-        connectivity: Connectivity type ('sides', 'edges', 'corners')
-        method: Tortuosity method ('DSPSM' or 'SSPSM')
-        direction: Direction of analysis (0=x, 1=y, 2=z)
-        voxel_dimension: Voxel size tuple
-        seed: Random seed for reproducibility
-        verbose: Print progress information
-        
-    Returns:
-        Dictionary with:
-        - 'optimized_ms': Best microstructure found (numpy array)
-        - 'final_loss': Best loss achieved
-        - 'final_tort': Actual tortuosity of optimized microstructure
-        - 'generations': Number of generations run
-        - 'evaluations': Total function evaluations
-    """
-    
-    if seed is not None:
-        np.random.seed(seed)
-    
-    if verbose:
-        mpi_logging("\n" + "="*70)
-        mpi_logging("MICROSTRUCTURE TORTUOSITY OPTIMIZATION (MCRpy)")
-        mpi_logging("="*70)
-        mpi_logging(f"Shape: {ms_shape}")
-        mpi_logging(f"Number of phases: {n_phases}")
-        mpi_logging(f"Target tortuosity: {target_tortuosity:.6f}")
-        mpi_logging(f"Phase of interest: {phase_of_interest}")
-        mpi_logging(f"Connectivity: {connectivity}")
-        mpi_logging(f"Method: {method}")
-        mpi_logging(f"Direction: {direction}")
-        mpi_logging(f"Population size: {pop_size}")
-        mpi_logging(f"Max generations: {max_generations}")
-        mpi_logging("="*70 + "\n")
-    
-    # Configure logging to suppress intermediate messages
-    logging.basicConfig(level=logging.CRITICAL, force=True)
-    
-    # Define problem
-    problem = MicrostructureOptimizationProblem(
-        ms_shape=ms_shape,
-        n_phases=n_phases,
-        target_tortuosity=target_tortuosity,
-        phase_of_interest=phase_of_interest,
-        connectivity=connectivity,
-        method=method,
-        direction=direction,
-        voxel_dimension=voxel_dimension
-    )
-    
-    # Define algorithm with tuned parameters for discrete optimization
-    # For discrete (integer) problems, we need higher mutation rates
-    algorithm = GA(
-        pop_size=pop_size,
-        sampling=DiverseRandomSampling(),
-        crossover=SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair()),
-        # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
-        #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases), #seems to work well for very small examples
-        mutation=PM(prob=0.5, eta=1,vtype=float, repair=RoundingRepair()),
-        eliminate_duplicates=True
-    )
-    
-    # Callback for progress tracking
-    best_loss_so_far = [float('inf')]
-    
-    stop_data = {}
-
-    def callback(algorithm):
-        current_pop = algorithm.pop
-        F = current_pop.get("F")
-        current_best = float(np.min(F))
-        if current_best < best_loss_so_far[0]:
-            best_loss_so_far[0] = current_best
-            if verbose:
-                mpi_logging(f"Gen {algorithm.n_gen}: Loss improved to {current_best:.6f}")
-        else:
-            if verbose:
-                mpi_logging(f"Gen {algorithm.n_gen}: no improvement.",end='\r')
-
-
-        # Early stop if a loss threshold is provided and reached
-        if tolerance is not None and current_best <= tolerance:
-            best_idx = int(np.argmin(F))
-            Xpop = current_pop.get("X")
-            stop_data['X'] = Xpop[best_idx].copy()
-            stop_data['F'] = float(F[best_idx])
-            stop_data['n_gen'] = int(algorithm.n_gen)
-            raise StopIteration("early stop: loss below threshold")
-        
-    # Run optimization (catch StopIteration from early-stop callback)
-    try:
-        res = minimize(
-            problem,
-            algorithm,
-            ('n_gen', max_generations),
-            seed=seed,
-            verbose=False,
-            callback=callback
-        )
-    except StopIteration:
-        # Build a minimal result-like object from stop_data
-        class SimpleRes:
-            pass
-        res = SimpleRes()
-        res.X = stop_data['X']
-        res.F = np.array([stop_data['F']])
-        res.algorithm = type('A', (), {'n_gen': stop_data.get('n_gen', 0)})()
-    
-    # Extract best solution
-    best_individual = res.X
-    best_loss = res.F[0]
-    
-    # Reshape and compute final tortuosity
-    optimized_ms = best_individual.reshape(ms_shape).astype(int)
-    
-    # Re-compute final tortuosity using descriptor
-    descriptor = Tortuosity.make_singlephase_descriptor(
-        connectivity=connectivity,
-        method=method,
-        direction=direction,
-        phase_of_interest=phase_of_interest,
-        voxel_dimension=voxel_dimension
-    )
-    final_tort = float(descriptor(optimized_ms))
-
-    total_eval_count = comm.reduce(problem.eval_count, op=MPI.SUM, root=0)
-    
-    if verbose:
-        mpi_logging("\n" + "="*70)
-        mpi_logging("OPTIMIZATION RESULTS")
-        mpi_logging("="*70)
-        mpi_logging(f"Final loss: {best_loss:.6f}")
-        mpi_logging(f"Target tortuosity: {target_tortuosity:.6f}")
-        mpi_logging(f"Optimized tortuosity: {final_tort:.6f}")
-        mpi_logging(f'direction {direction}, phase {phase_of_interest}')
-        mpi_logging(f"Tortuosity error: {np.abs(final_tort - target_tortuosity):.6f}")
-        mpi_logging(f"Generations: {res.algorithm.n_gen}")
-        mpi_logging(f"Total evaluations: {total_eval_count}")
-        mpi_logging("="*70)
-        mpi_logging("\nOptimized microstructure:")
-        mpi_logging(optimized_ms)
-        mpi_logging()
-    
-    return {
-        'optimized_ms': optimized_ms,
-        'final_loss': best_loss,
-        'final_tort': final_tort,
-        'generations': res.algorithm.n_gen,
-        'evaluations': problem.eval_count
-    }
-
-
 class GeneticAlgorithm(Optimizer):
     """MCRpy optimizer adapter wrapping pymoo-based GA runs.
 
@@ -496,8 +196,6 @@ class GeneticAlgorithm(Optimizer):
         self.crossover = None
         self.mutation = None
 
-        self.set_up_pymoo() #setting up the genetic algorithm using pymoo library
-
     def set_up_pymoo(self):
 
         ms_shape = self.ms.spatial_shape
@@ -505,13 +203,34 @@ class GeneticAlgorithm(Optimizer):
         xl = np.zeros(n_elements) # lower bound for variables in function to be evaluated
         xu = np.full(n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
 
-        self.problem = Problem(          
-            n_var=n_elements, # the number of variables for optimization problem is the size of the microstructure.
-            n_obj=1, # number of objective functions to be minimized 
-            n_constr=0, # number of constraints
-            type_var=int, # type of variables are ints
-            xl=xl,
-            xu=xu)
+        class OpimizationProblem(Problem):          
+            def __init__(self,call_loss, use_multiphase):
+                self.call_loss = call_loss
+                self.use_multiphase = use_multiphase
+                super().__init__(n_var=n_elements, # the number of variables for optimization problem is the size of the microstructure.
+                                n_obj=1, # number of objective functions to be minimized 
+                                n_constr=0, # number of constraints
+                                type_var=int, # type of variables are ints
+                                xl=xl,
+                                xu=xu)
+
+            def _evaluate(self, X, out, *args, **kwargs):
+                fitness = []
+                for individuum in X:
+                    arr = individuum.astype(int).reshape(ms_shape)
+                    try:
+                        temp_ms = MutableMicrostructure(arr, use_multiphase=self.use_multiphase, trainable=False)
+                        val = float(self.call_loss(temp_ms))
+                    except Exception as e:
+                        logging.debug(f'Error evaluating candidate: {e}')
+                        val = np.inf
+                    fitness.append(val)
+                    out['F'] = np.array(fitness).reshape(-1,1)
+
+        self.problem = OpimizationProblem(          
+            call_loss=self.call_loss,
+            use_multiphase=self.use_multiphase
+            )
 
         self.sampling=DiverseRandomSampling()
         self.crossover = SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair())
@@ -530,29 +249,15 @@ class GeneticAlgorithm(Optimizer):
         # prepare the algorithm to solve the specific problem (same arguments as for the minimize function)
         self.algorithm.setup(self.problem, termination=NoTermination(), verbose=False)
 
-        
-        def pymoo_callback(self):
-            current_population = self.algorithm.pop
-            F = current_population.get("F")
-            current_best = float(np.min(F))
-
-            # Early stop if a loss threshold is provided and reached
-            if tolerance is not None and current_best <= tolerance:
-                best_idx = int(np.argmin(F))
-                Xpop = current_population.get("X")
-                stop_data['X'] = Xpop[best_idx].copy()
-                stop_data['F'] = float(F[best_idx])
-                stop_data['n_gen'] = int(self.algorithm.n_gen)
-                raise StopIteration("early stop: loss below threshold")
-        
-        self.pymoo_callback = pymoo_callback()
-
     def optimize(self, ms: MutableMicrostructure, restart_from_niter: int = None):
         """Optimization loop."""
+
         self.n_iter = 0 if restart_from_niter is None else restart_from_niter
         self.iters_since_last_accept = 0
         self.ms = ms
         self.current_loss = self.call_loss(self.ms)
+
+        self.set_up_pymoo() #setting up the genetic algorithm using pymoo library
 
         while self.n_iter < self.max_iter:
             if self.iters_since_last_accept >= self.conv_iter:
@@ -569,17 +274,19 @@ class GeneticAlgorithm(Optimizer):
     def step(self):
 
         self.algorithm.next() # evaluate the next generation
-        result = self.algorithm.result() # ask to get the the next generation 
-        loss_vals = result.F
-        current_best_loss = float(np.min(loss_vals))
+        result = self.algorithm.result() # getting the results for the evaluated generation
+        new_loss = float(result.F)
+        X = result.X.copy()
+        #current_best_ms = X[best_idx].copy()
+        current_best_ms_arr = X.reshape(self.ms.spatial_shape)
         
-        print(result.F)
-    
-        new_loss = self.call_loss(self.ms)
+            
+        #new_loss = self.call_loss(self.ms)
         loss_amelioration = self.current_loss - new_loss
         if loss_amelioration > 0 :
             self.iters_since_last_accept = 0
             self.current_loss = new_loss
+            self.ms = MutableMicrostructure(current_best_ms_arr, use_multiphase=self.use_multiphase, trainable=False)
         else:
             self.iters_since_last_accept += 1
         self.n_iter += 1
