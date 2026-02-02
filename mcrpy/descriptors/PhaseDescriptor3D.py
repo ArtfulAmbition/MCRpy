@@ -127,6 +127,18 @@ class PhaseDescriptor3D(PhaseDescriptor):
 def avg_pool3d(x: tf.Tensor, pool_size: int):
     if pool_size < 2:
         return x
+    # Trim odd spatial dimensions so that slicing with ::2 and 1::2 yields matching shapes.
+    # This ensures the pooled result has shape floor(original/2) per axis and avoids
+    # mismatches when dimensions are not divisible by 2**k.
+    shape = tf.shape(x)
+    h = shape[1]
+    w = shape[2]
+    d = shape[3]
+    h_trim = h - tf.math.mod(h, 2)
+    w_trim = w - tf.math.mod(w, 2)
+    d_trim = d - tf.math.mod(d, 2)
+    x = x[:, :h_trim, :w_trim, :d_trim, :]
+
     y = (
         x[:, ::2, ::2, ::2, :] +
         x[:, 1::2, ::2, ::2, :] +

@@ -52,14 +52,14 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descri
                                     use_multigrid_descriptor=use_multigrid,
                                     use_multigrid_reconstruction=use_multigrid,
                                     target_folder='results',
-                                    population_size=3,
+                                    population_size=5,
                                     tolerance=1e-5,
                                     logging_level=logging.INFO)
 
 
 print("="*60)
 print("Reconstruct microstructure...")
-convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (200, 200, 200), 
+convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (20, 20, 20), 
                                           settings=reconstruction_settings3D,
                                           )
 

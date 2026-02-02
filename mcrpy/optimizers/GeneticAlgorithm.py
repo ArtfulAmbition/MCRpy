@@ -47,6 +47,9 @@ def mpi_logging(message:str='', mode:str='default', end:str='\n'):
             raise TypeError(f'mode {mode} not implemented.')
 
 class DiverseRandomSampling(Sampling):
+    def __init__(self, initial_ms:MutableMicrostructure):
+        super().__init__()
+        self.initial_ms=initial_ms
     """Custom sampling to ensure phase diversity in initial population.
     
     Optionally creates an initial connected path for the phase_of_interest
@@ -57,6 +60,7 @@ class DiverseRandomSampling(Sampling):
         """Generate diverse initial population with mixed phases.
         Optionally ensures connectivity for phase_of_interest.
         """
+        
         def calculate_X():
             n_phases = int(problem.xu[0]) + 1
             
@@ -70,15 +74,22 @@ class DiverseRandomSampling(Sampling):
                 
                 for i in range(n_samples):
                     # Generate random microstructure
-                    init_ms = np.random.randint(0, n_phases, ms_shape).astype(int)
-                    self._add_connected_path(init_ms, phase_of_interest, direction, dimensionality)
+                    rand_ms_arr = np.random.randint(0, n_phases, ms_shape).astype(int)
+                    self._add_connected_path(rand_ms_arr, phase_of_interest, direction, dimensionality)
                     
-                    X[i] = init_ms.flatten()
+                    X[i] = rand_ms_arr.flatten()
                 
-                return X
             else:
                 X = np.random.randint(0,n_phases,size=(n_samples, problem.n_var), dtype=int)
+            
+            if self.initial_ms:
+                # if an initial microstructure is given, replace one of the individuums with it 
+                arr = self.initial_ms.get_full_field()
+                X[0] = arr.flatten()
+            
             return X
+        
+
         
         if comm.rank==0:
             X_to_broadcast = calculate_X()
@@ -204,7 +215,9 @@ class GeneticAlgorithm(Optimizer):
         xu = np.full(n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
 
         class OpimizationProblem(Problem):          
-            def __init__(self,call_loss, use_multiphase):
+            def __init__(self,call_loss, 
+                         use_multiphase
+                         ):
                 self.call_loss = call_loss
                 self.use_multiphase = use_multiphase
                 super().__init__(n_var=n_elements, # the number of variables for optimization problem is the size of the microstructure.
@@ -232,7 +245,7 @@ class GeneticAlgorithm(Optimizer):
             use_multiphase=self.use_multiphase
             )
 
-        self.sampling=DiverseRandomSampling()
+        self.sampling=DiverseRandomSampling(initial_ms=self.ms)
         self.crossover = SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair())
         self.mutation = PM(prob=0.5, eta=1,vtype=float, repair=RoundingRepair())
 
