@@ -37,6 +37,8 @@ from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity
 import logging
 from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
 
+tf.config.run_functions_eagerly(True)
+
 class Pathfinder():
     def __init__(self,
                  ms_phase_of_interest: NDArray[np.bool_],
@@ -440,9 +442,9 @@ class Tortuosity(PhaseDescriptor3D):
             return tf.cast(tf.constant(mean_tortuosity), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
-    @staticmethod
-    def make_multiphase_descriptor():
-        return 0
+    # @staticmethod
+    # def make_multiphase_descriptor():
+    #     return 0
 
 def register() -> None:
     descriptor_factory.register("Tortuosity3D", Tortuosity)

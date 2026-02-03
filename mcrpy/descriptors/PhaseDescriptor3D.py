@@ -86,6 +86,8 @@ class PhaseDescriptor3D(PhaseDescriptor):
         limitation_factor = min(H / limit_to, W / limit_to)
         mg_levels = int(np.floor(np.log(limitation_factor) / np.log(2)))
         singlephase_descriptors = []
+        if mg_levels ==0:
+            a=1
         for mg_level in range(mg_levels):
             pool_size = 2**mg_level
             if H % pool_size != 0 or W % pool_size != 0:
@@ -104,27 +106,50 @@ class PhaseDescriptor3D(PhaseDescriptor):
 
         # @tf.function
         def multigrid_descriptor(mg_input):
+            '''calculates the descriptor values on the mg_input (the input microstructure)
+            on different multigrid levels (downsampled version of the microstructure)'''
             mg_layers = []
             # print('######################## enter function #############################')
             # print(type(mg_input))
             # with tf.device('XLA_CPU_JIT'):
             for mg_level, singlephase_descriptor in enumerate(singlephase_descriptors):
                 pool_size = 2**mg_level
+                print(f' level: {mg_level}')
                 if isinstance(mg_input, IndicatorFunction):
                     mg_pool = IndicatorFunction(avg_pool3d(mg_input.x, pool_size))
                 else:
-                    mg_pool = avg_pool3d(mg_input, pool_size)
+                    mg_pool = avg_pool3d(mg_input, pool_size) # mg_pool is the downsampled ms array
                 # print(f'{mg_level=}')
                 # print(f'{tf.size(mg_pool)=}')
-                mg_desc = singlephase_descriptor(mg_pool)
+                mg_desc = singlephase_descriptor(mg_pool) # evaluated descriptor values of the current descriptor applied on downsampled ms
+                print(f'descr: {mg_desc}')
                 mg_exp = tf.expand_dims(mg_desc, axis=0)
                 mg_layers.append(mg_exp)
+                if len(mg_layers)==0:
+                    a=1
+            if len(mg_layers)==0:
+                a=1
             outputs = tf.concat(mg_layers, axis=0) if len(mg_layers) > 1 else mg_layers[0]
             return outputs
 
         return multigrid_descriptor
 
 def avg_pool3d(x: tf.Tensor, pool_size: int):
+    """Downsample a 5D tensor [batch, H, W, D, channels].
+
+    Behavior:
+    - If `pool_size < 2` returns input unchanged.
+    - Trims odd spatial dimensions (drops the last row/col/slice) so that
+      slicing with ::2 and 1::2 yields matching blocks.
+    - Computes the mean of each 2x2x2 block by summing eight shifted slices
+      and dividing by 8.0.
+    - If `pool_size > 2`, applies pooling recursively to reach the desired
+      power-of-two reduction (pool_size = 2**k).
+    - so for example, if x.shape = (1,64,64,64,1) and the pool size is 32, a tensor of
+      shape (1,2,2,2,1) is returned, representing the average of 32x32x32 voxels each.
+
+    Returns a floating-point tensor with reduced spatial resolution.
+    """
     if pool_size < 2:
         return x
     # Trim odd spatial dimensions so that slicing with ::2 and 1::2 yields matching shapes.
