@@ -5,7 +5,7 @@ import pickle
 from mcrpy.view import view
 import logging
 
-use_multigrid = False
+use_multigrid = True
 
 limit_to = 8 # maximale Laenge des Vektors in x oder y-Richtung
 descriptor_types = ['VolumeFractions3D']

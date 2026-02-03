@@ -47,7 +47,8 @@ def mpi_logging(message:str='', mode:str='default', end:str='\n'):
             raise TypeError(f'mode {mode} not implemented.')
 
 class DiverseRandomSampling(Sampling):
-    def __init__(self, initial_ms:MutableMicrostructure):
+    def __init__(self, 
+                 initial_ms:MutableMicrostructure):
         super().__init__()
         self.initial_ms=initial_ms
     """Custom sampling to ensure phase diversity in initial population.
@@ -84,7 +85,9 @@ class DiverseRandomSampling(Sampling):
             
             if self.initial_ms:
                 # if an initial microstructure is given, replace one of the individuums with it 
-                arr = self.initial_ms.get_full_field()
+                arr = self.initial_ms.get_full_field(phase_number=0).numpy()
+                if arr.dtype!=int:
+                    arr = np.round(arr).astype(int)
                 X[0] = arr.flatten()
             
             return X
