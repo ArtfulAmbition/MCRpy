@@ -6,17 +6,19 @@ from mcrpy.view import view
 import logging
 
 
-use_multigrid = True
+use_multigrid = False
+use_multiphase = False
 
-limit_to = 8 # maximale Laenge des Vektors in x oder y-Richtung
-#descriptor_types = ['VolumeFractions3D']
+limit_to = 1 # maximale Laenge des Vektors in x oder y-Richtung
+# descriptor_types = ['VolumeFractions3D']
 descriptor_types = ['Tortuosity3D','VolumeFractions3D']
+
 
 characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=descriptor_types,
                                                            full_3d=True,
                                                            limit_to=limit_to,
                                                            use_multigrid_descriptor=use_multigrid,
-                                                           use_multiphase=False,
+                                                           use_multiphase=use_multiphase,
                                                            target_folder='results',
                                                            logging_level=logging.WARNING)
 
@@ -26,7 +28,7 @@ print("Load similar 3D microstructure ...")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=False)
 #ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_8x8x8.npy",use_multiphase=False)
-ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",use_multiphase=False)
+ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",use_multiphase=use_multiphase)
 
 ms = ms3D
 
@@ -44,8 +46,8 @@ print(f"characterization: {description3D}")
 #                                     use_multigrid_descriptor=False)
 
 reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descriptor_types,
-                                    use_multiphase=False, 
-                                    max_iter=1000,
+                                    use_multiphase=use_multiphase, 
+                                    max_iter=10,
                                     full_3d=True,
                                     limit_to=limit_to,
                                     convergence_data_steps=1, outfile_data_steps=1,

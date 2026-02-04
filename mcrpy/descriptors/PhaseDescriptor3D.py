@@ -25,7 +25,6 @@ import tensorflow as tf
 
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from mcrpy.src.IndicatorFunction import IndicatorFunction
-import traceback
 
 class PhaseDescriptor3D(PhaseDescriptor):
 
@@ -82,11 +81,6 @@ class PhaseDescriptor3D(PhaseDescriptor):
             limit_to=8,
             **kwargs):
 
-        logging.info(f'{cls.__name__}.make_multigrid_descriptor called with desired_shape_2d={desired_shape_2d}, desired_shape_extended={desired_shape_extended}, limit_to={limit_to}, kwargs_keys={list(kwargs.keys())}')
-        # log a short call stack (last few frames) to help find origin of limit_to
-        stack = ''.join(traceback.format_stack()[-6:])
-        logging.info(f'Call stack (most recent last):\n{stack}')
-
         H, W = desired_shape_2d
         n_phases = desired_shape_extended[-1]
         limitation_factor = min(H / limit_to, W / limit_to)
@@ -117,22 +111,16 @@ class PhaseDescriptor3D(PhaseDescriptor):
             # with tf.device('XLA_CPU_JIT'):
             for mg_level, singlephase_descriptor in enumerate(singlephase_descriptors):
                 pool_size = 2**mg_level
-                print(f' level: {mg_level}')
                 if isinstance(mg_input, IndicatorFunction):
                     mg_pool = IndicatorFunction(avg_pool3d(mg_input.x, pool_size))
                 else:
                     mg_pool = avg_pool3d(mg_input, pool_size) # mg_pool is the downsampled ms array
-                # print(f'{mg_level=}')
-                # print(f'{tf.size(mg_pool)=}')
                 mg_desc = singlephase_descriptor(mg_pool) # evaluated descriptor values of the current descriptor applied on downsampled ms
-                print(f'descr: {mg_desc}')
                 mg_exp = tf.expand_dims(mg_desc, axis=0)
                 mg_layers.append(mg_exp)
-                if len(mg_layers)==0:
-                    a=1
-            if len(mg_layers)==0:
-                a=1
+
             outputs = tf.concat(mg_layers, axis=0) if len(mg_layers) > 1 else mg_layers[0]
+
             return outputs
 
         return multigrid_descriptor

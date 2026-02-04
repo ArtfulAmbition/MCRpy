@@ -384,7 +384,6 @@ class Tortuosity(PhaseDescriptor3D):
 
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
-            
             if (len(ms.shape) > 3): # if called from mcrpy (would be a 4D tensor). If an microstructure is already 2 or 3D, don't change it.
                 # make sure ms is a numpy array
                 ms = np.asarray(ms)
