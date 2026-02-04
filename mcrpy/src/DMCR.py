@@ -290,6 +290,7 @@ class DMCR:
             use_multiphase=self.use_multiphase,
             target_folder=self.save_to,
             logging_level=logging.INFO,
+            limit_to=self.limit_to,
         )
 
 

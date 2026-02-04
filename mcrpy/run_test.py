@@ -5,6 +5,7 @@ import pickle
 from mcrpy.view import view
 import logging
 
+
 use_multigrid = True
 
 limit_to = 8 # maximale Laenge des Vektors in x oder y-Richtung
@@ -20,7 +21,7 @@ characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=desc
                                                            logging_level=logging.WARNING)
 
 print("Load similar 3D microstructure ...")
-ms2D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_2D_20x20.npy")
+#ms2D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_2D_20x20.npy")
 #ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=False)
@@ -44,7 +45,7 @@ print(f"characterization: {description3D}")
 
 reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descriptor_types,
                                     use_multiphase=False, 
-                                    max_iter=10,
+                                    max_iter=1000,
                                     full_3d=True,
                                     limit_to=limit_to,
                                     convergence_data_steps=1, outfile_data_steps=1,

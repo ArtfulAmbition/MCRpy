@@ -66,5 +66,6 @@ class PhaseDescriptor(Descriptor):
                 phase_descriptor = tf.expand_dims(singlephase_descriptor(tf.expand_dims(x_phase, axis=-1)), axis=0)
                 phase_descriptors.append(phase_descriptor)
             return tf.concat(phase_descriptors, axis=0)
+        
         return multiphase_wrapper if use_multiphase else singlephase_wrapper
 

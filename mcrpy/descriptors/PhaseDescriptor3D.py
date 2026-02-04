@@ -25,6 +25,7 @@ import tensorflow as tf
 
 from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from mcrpy.src.IndicatorFunction import IndicatorFunction
+import traceback
 
 class PhaseDescriptor3D(PhaseDescriptor):
 
@@ -81,19 +82,21 @@ class PhaseDescriptor3D(PhaseDescriptor):
             limit_to=8,
             **kwargs):
 
+        logging.info(f'{cls.__name__}.make_multigrid_descriptor called with desired_shape_2d={desired_shape_2d}, desired_shape_extended={desired_shape_extended}, limit_to={limit_to}, kwargs_keys={list(kwargs.keys())}')
+        # log a short call stack (last few frames) to help find origin of limit_to
+        stack = ''.join(traceback.format_stack()[-6:])
+        logging.info(f'Call stack (most recent last):\n{stack}')
+
         H, W = desired_shape_2d
         n_phases = desired_shape_extended[-1]
         limitation_factor = min(H / limit_to, W / limit_to)
         mg_levels = int(np.floor(np.log(limitation_factor) / np.log(2)))
         singlephase_descriptors = []
-        if mg_levels ==0:
-            a=1
         for mg_level in range(mg_levels):
             pool_size = 2**mg_level
             if H % pool_size != 0 or W % pool_size != 0:
                 logging.warning('For MG level number {}, an avgpooling remainder exists.'.format(mg_level))
             desired_shape_layer = tuple(s//pool_size for s in desired_shape_2d)
-            # print(f'{desired_shape_layer=}')
             singlephase_kwargs = {
                     'desired_shape_2d': desired_shape_layer,
                     'desired_shape_extended': (1, *desired_shape_layer, n_phases),
@@ -181,3 +184,5 @@ def avg_pool3d(x: tf.Tensor, pool_size: int):
     if pool_size > 2:
         y = avg_pool3d(y, pool_size=pool_size//2)
     return y
+
+
