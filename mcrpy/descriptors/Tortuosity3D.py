@@ -36,6 +36,8 @@ from scipy.sparse.csgraph import dijkstra as sp_dijkstra
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions, slice_ndarray, plot_slices
 import logging
 from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
+from mcrpy.view import view
+import SimpleITK as sitk
 
 tf.config.run_functions_eagerly(True)
 
@@ -226,9 +228,11 @@ class Pathfinder():
             self.distance_matrix = sp_dijkstra(csgraph=self.adjacency_matrix, directed=False, indices=all_sources)
             logging.debug(f"DSPSM: Dijkstra completed")
         except Exception as e:
-            logging.error(f"DSPSM: Dijkstra computation failed: {e}")
-            # self.abort_calculation()
-            # return False
+            logging.error(f"DSPSM: Dijkstra computation failed: {e}", exc_info=True)
+            # Abort calculation and set tortuosities to zero when Dijkstra fails
+            self.abort_calculation(mode='global')
+            print(f'Error: Dijkstra computation failed: {e}')
+            return False
         logging.info('Finished multi-source dijkstra computation.')
         return True
 
@@ -240,6 +244,11 @@ class Pathfinder():
         """
 
         dist_matrix = self.distance_matrix
+        if dist_matrix is None:
+            logging.error('DSPSM: Distance matrix is None. Dijkstra did not complete successfully.')
+            # Ensure we abort calculation and set tortuosities to zero
+            self.abort_calculation(mode='global')
+            return False
         # normalize dist_matrix to 2D where rows correspond to sources
         if dist_matrix.ndim == 1:
             dist_matrix = dist_matrix[np.newaxis, :]
@@ -299,11 +308,11 @@ class Tortuosity(PhaseDescriptor3D):
     @staticmethod
     def make_singlephase_descriptor(
         
-        connectivity : Union[int,str] = 'sides', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
+        connectivity : Union[int,str] = 'corners', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
         # for connectivity via sides, edges and corners --> possible arguments ['corners' (for 2D and 3D), 26 (for 3D), 8 (for 2D)]  
-        method : str = 'DSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
+        method : str = 'SSPSM', # implemented methods: 'DSPSM' and 'SSPSM'
         directions_list : Union[list[int],None] = None, #0:x, 1:y, 2:z if None, calculate in all available direction
         direction_mode:str = 'positive', # specifies in which direction the tortuosity is calculated. +#
                                          # 'positive': in direction of the direction coordinate
@@ -339,14 +348,25 @@ class Tortuosity(PhaseDescriptor3D):
 
             return pathfinder.tortuosity_list
         
-        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], directions: list, plotting:bool=False, method='skeletonize', ):
+        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], directions: list, method='medial_axis', do_paraview_plot:bool=True ):
             '''
             Skeleton Shortest Path Searching Method
             '''     
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
 
             if method == 'medial_axis':
-                raise NotImplementedError('Error: Method "medial_axis" not yet implemented in SSPSM.')
+
+                # using SimpleITK:
+                sitk_image = sitk.GetImageFromArray(ms_phase_of_interest.astype(np.uint8))
+                distance_transform = sitk.SignedMaurerDistanceMap(sitk_image, 
+                                                                  insideIsPositive=True, 
+                                                                  squaredDistance=False, 
+                                                                  useImageSpacing=False)
+                medial_axis = sitk.BinaryThinning(distance_transform > 0)
+                medial_axis_array = sitk.GetArrayFromImage(medial_axis)
+                skeleton_ms = medial_axis_array.astype(bool)
+                #raise NotImplementedError('Error: Method "medial_axis" not yet implemented in SSPSM.')
+                
                 # dimensionality = len(ms_phase_of_interest.shape)
                 # if dimensionality == 3 and not any(dim == 1 for dim in ms_phase_of_interest.shape):
                 #     total_number_slices = ms_phase_of_interest.shape[direction]
@@ -379,6 +399,13 @@ class Tortuosity(PhaseDescriptor3D):
                 skeleton_ms = skeletonize(ms_phase_of_interest)
             else:
                 raise NotImplementedError('Error: Method {method} not implemented in SSPSM.')
+
+            if do_paraview_plot:
+                from mcrpy.src.Microstructure import Microstructure
+                MS_phase_of_interest = Microstructure(ms_phase_of_interest.astype(int))
+                skeleton_MS = Microstructure(skeleton_ms.astype(int))
+                view(MS_phase_of_interest,save_as='PhaseofInterest')
+                view(skeleton_MS,save_as='SkeletonPhaseofInterest')
 
             return DSPSM(skeleton_ms, directions) # calculate the tortuosity based on the skeleton of the ms 
 

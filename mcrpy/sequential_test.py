@@ -1,20 +1,42 @@
 import mcrpy
 import numpy as np
-import os
-import pickle
 from mcrpy.view import view
 import logging
+from mcrpy.src import loader
+from mcrpy.src.MutableMicrostructure import MutableMicrostructure
+from mcrpy.src.descriptor_factory import get_class
+from mcrpy.view import view_microstructure
 
+''' This code is for the purpose of performing a microstructure reconstruction 
+using differiable and non-differentiable descriptors. For performance reasons, 
+this is split into 2 steps. 
+Step 1: Reconstruction using only the differentiable descriptors.
+Step 2: Further Reconstruction using all desired descriptors with the reconstructed 
+MS from step 1 as start point for the iteration.'''
+
+desired_descriptor_list = ['Tortuosity3D',
+                    'VolumeFractions3D',
+                    'TPB3D',
+                    'DPB3D',
+                    'FFTCorrelations3D'] #TODO: Percolation3D
+
+
+# Load descriptor modules to check whether they are differentiable
+loader.load_plugins([f'mcrpy.descriptors.{descriptor}' for descriptor in desired_descriptor_list])
+
+# Descriptor types that are differentiable
+desired_differentiable_descriptor_list = [descriptor for descriptor in desired_descriptor_list 
+                                   if get_class(descriptor).is_differentiable]
 
 use_multigrid = False
 use_multiphase = True
+do_paraview_plot = False
 
-limit_to = 4 # maximale Laenge des Vektors in x oder y-Richtung
-# descriptor_types = ['VolumeFractions3D']
-descriptor_types = ['Tortuosity3D','VolumeFractions3D','TPB3D','DPB3D']
+limit_to = 8    # maximale Laenge des Vektors in x oder y-Richtung for example for FFTCorrelations3D.
+                # if used on singlegrid --> only short-range descriptor, else also long-range.
 
-
-characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=descriptor_types,
+# Characterization of the MS using all descriptors
+characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=desired_descriptor_list,
                                                            full_3d=True,
                                                            limit_to=limit_to,
                                                            use_multigrid_descriptor=use_multigrid,
@@ -28,9 +50,11 @@ print("Load similar 3D microstructure ...")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=False)
 #ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_8x8x8.npy",use_multiphase=False)
-ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",use_multiphase=use_multiphase)
+#ms = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",use_multiphase=use_multiphase)
+ms = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600 copy.npy",use_multiphase=use_multiphase)
 
-ms = ms3D
+if do_paraview_plot:
+    view(ms,save_as='MyMicrostructure')
 
 print("Characterize similar 3D image ...")
 description3D = mcrpy.characterize(ms, characterization_settings)
@@ -45,7 +69,7 @@ print(f"characterization: {description3D}")
 #                                     mutation_rule="relaxed_neighbor",
 #                                     use_multigrid_descriptor=False)
 
-reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=descriptor_types,
+reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=desired_descriptor_list,
                                     use_multiphase=use_multiphase, 
                                     max_iter=1000,
                                     full_3d=True,
