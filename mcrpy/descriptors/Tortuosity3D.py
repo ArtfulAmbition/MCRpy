@@ -337,6 +337,17 @@ class Tortuosity(PhaseDescriptor3D):
         assert all([val>0 for val in voxel_dimension]), "Only positive values for the voxel dimensions are permitted."
         assert direction_mode in ['positive', 'negative', 'both'], "Valid inputs for direction_mode are 'positive', 'negative' or 'both'."
         
+        def get_connected_ms(ms_phase_of_interest: NDArray[np.bool_], directions) -> NDArray[np.bool_]:
+            '''return a boolean ms that only contains the voxels of ms_phase_of_interest, which are connected by cluster to adjacent sides'''
+            labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
+            ms_connected_phase_of_interest = np.zeros_like(labeled_ms, dtype=bool)
+            
+            for direction in directions:
+                ms_connected_phase_of_interest_dir, _ = get_connected_phases_of_interest(labeled_ms, direction)
+                ms_connected_phase_of_interest = ms_connected_phase_of_interest | ms_connected_phase_of_interest_dir
+
+            return ms_connected_phase_of_interest
+
         #@tf.function
         def DSPSM(ms_phase_of_interest: NDArray[np.bool_], directions: list):
             assert ms_phase_of_interest.dtype == bool, "Error: ms_phase_of_interest must only contain bool values!"
@@ -352,7 +363,7 @@ class Tortuosity(PhaseDescriptor3D):
                   directions: list, 
                   method:str='skeletonize', 
                   directional_invariant:bool=True,
-                  do_paraview_plot:bool=True):
+                  do_paraview_plot:bool=False):
             '''
             Skeleton Shortest Path Searching Method
             '''     
@@ -440,6 +451,8 @@ class Tortuosity(PhaseDescriptor3D):
 
             return DSPSM(skeleton_ms, directions) # calculate the tortuosity based on the skeleton of the ms 
 
+        
+
         #@tf.function
         def model(ms: Union[tf.Tensor, NDArray[Any]]) -> tf.Tensor:
             if (len(ms.shape) > 3): # if called from mcrpy (would be a 4D tensor). If an microstructure is already 2 or 3D, don't change it.
@@ -470,11 +483,7 @@ class Tortuosity(PhaseDescriptor3D):
                 # microstructure ms where the searched for phase is represented as True, else False.
                 # For further calculations, use ms_phase_of_interest:
             
-            # the following is optional: reducing the number of voxels to check by only considering cluster which 
-            # go from one side to another: 
-            labeled_ms, _ = get_labeled_ms(ms_phase_of_interest, connectivity=connectivity)
-            ms_connected_phase_of_interest = np.zeros_like(labeled_ms, dtype=bool)
-           
+
             dimensionality = len(ms.shape)      
 
             if directions_list is None:
@@ -483,12 +492,8 @@ class Tortuosity(PhaseDescriptor3D):
                 directions = directions_list
             assert all(isinstance(dir, int) and 0 <= dir <= dimensionality-1
                    for dir in directions), f"All elements of direction_list must be positve integers <= {dimensionality-1} (0=x,1=y,2=z).)"
-           
-            for direction in directions:
-                ms_connected_phase_of_interest_dir, _ = get_connected_phases_of_interest(labeled_ms, direction)
-                ms_connected_phase_of_interest = ms_connected_phase_of_interest | ms_connected_phase_of_interest_dir
 
-            ms_phase_of_interest = ms_connected_phase_of_interest
+            ms_phase_of_interest = get_connected_ms(ms_phase_of_interest, directions)
 
             if method == 'DSPSM':  
                 mean_tortuosity = DSPSM(ms_phase_of_interest, directions=directions)
@@ -507,172 +512,3 @@ def register() -> None:
     descriptor_factory.register("Tortuosity3D", Tortuosity)
 
        
-
-if __name__=="__main__":
-
-    # Configure logging for standalone execution
-    import os
-    log_dir = './tortuosity_logs'
-    os.makedirs(log_dir, exist_ok=True)
-    log_file = os.path.join(log_dir, 'tortuosity.log')
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.DEBUG,
-        format='%(asctime)s.%(msecs)03d - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S',
-        force=True  # Override any previous basicConfig
-    )
-    logging.info("="*60)
-    logging.info("TORTUOSITY DESCRIPTOR - STANDALONE EXECUTION")
-    logging.info("="*60)
-    # Suppress Matplotlib logging
-    logging.getLogger('matplotlib').setLevel(logging.WARNING)
-
-    import os
-    # folder = '/home/sobczyk/Dokumente/MCRpy/example_microstructures' 
-    #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    #minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
-
-    #minimal_example_ms = os.path.join(folder,'composite_resized_s.npy')
-
-    # minimal_example_ms = os.path.join(folder,'BlockingLayer_X_2D_20x20.npy')
-
-    # for filename in os.listdir(folder):
-    #     if filename.endswith('.npy'):  # Check if the file has a .npy extension
-    #         file_path = os.path.join(folder, filename)  # Full path to the file
-    #         print(f'filename: {filename}')
-    #         ms = np.load(file_path)  # Load the .npy file
-    #         #print(f'ms: {ms}')
-    #         print(f'type: {type(ms[0])}')
-    #         print(f'ms type: {type(ms)}, size: {ms.size}')
-    #         print(f'shape: {ms.shape}')
-    #         print(f'unique: {np.unique(ms)}')
-    #         print('\n\n')
-
-
-    # minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
-    #minimal_example_ms = os.path.join(folder,'Holzer2020_Segmented_Fine_Pristine_Zoom0.33_size600.npy')
-    # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
-    # minimal_example_ms = os.path.join(folder,'BlockingLayer_X_32x32x32.npy')
-
-    # ms = np.load(minimal_example_ms)
-
-    # ms = ms[:,:,-2:-1]
-
-    #ms = np.fliplr(ms)
-
-    # ms_len:int = 200
-    # ms = np.ones((ms_len,ms_len,ms_len))
-    # ms[:,round(ms_len/4):round(3/4*ms_len),round(ms_len/4):round(3/4*ms_len)] = 0
-
-    # l = 100
-    # ms = np.zeros((l,l,l))
-
-
-    #print(ms)
-
-    # print(f'ms: {ms}')
-    # print(f'type: {type(ms[0])}')
-    # print(f'ms type: {type(ms)}, size: {ms.size}')
-    
-    # print(np.unique(ms))
-
-    np.random.seed(11)  
-    ms = np.random.randint(low=0,high=2,size=(3,3,3))
-    #ms=np.ones(shape=(2,2)).astype(bool)
-    # ms = np.ones(shape=(2,2,2))
-    # ms[0,0] = 1
-    # ms[0,1] = 0
-    # ms[1,1] = 0
-    # ms[1,0] = 1
-    # ms = ms.astype(bool)
-    # # ms[0,0,0] = 0
-    # # ms[1,1,1] = 0
-    # # ms[2,2,2] = 0
-    # #ms = ms.astype(int)
-    print(f'ms:\n {ms}')
-
-    # pt = Pathfinder(ms_phase_of_interest=ms,
-    #                 direction_list=[0,1,2], direction_mode='both')
-    # pt.construct_adjacency_matrix()
-    # pt.find_compact_source_and_target_nodes()
-    # pt.calculate_distance_matrix()
-    # pt.get_shortest_paths_from_distance_matrix()
-    # pt.compute()
-
-    # print(pt.get_shortest_paths_from_distance_matrix())
-    # print(f'tort: {pt.tortuosity_list}')
-    # print(f'compact direction list: {pt.compact_direction_list}')
-    # ms = np.zeros((5,5,1))
-    # ms[1,2,0] = 1
-    # ms[2,1,0] = 1
-    # ms[2,2,0] = 1
-    # ms[2,3,0] = 1
-    # ms[3,2,0] = 1
-    # ms = ms.astype(int)
-
-    # ms = np.zeros((3, 3))
-    # ms[0,0] = 1
-    # ms[0,1] = 1
-    # ms[1,1] = 1
-    # ms[1,2] = 1
-
-    # ms = np.zeros((3, 3))
-    # ms[0,1] = 1
-    # ms[1,1] = 1
-    # ms[2,1] = 1
-    # ms[2,2] = 1
-
-    # print(f'ms:\n {ms}')
-    # print(f'shape: {(ms.shape)}')
-    # print(f'ms type: {type(ms)}, size: {ms.size}')
-
-#     ms = np.zeros((3, 3))
-#     ms[1,:] = 1
-#     print(f'ms: {ms}')
-#     print(f'shape: {(ms.shape)}')
-#     print(f'ms type: {type(ms)}, size: {ms.size}')
-
-    # 
-    # ms = np.random.randin=(70,70,70))
-    # print(f'ms: {ms}, size: {ms.size}')
-
-
-
-
-    
-    plotting=False
-    if plotting:
-        ms_to_plot = ms
-        if len(ms_to_plot.shape)==2 or (len(ms_to_plot.shape)==3 and ms_to_plot.shape[-1] == 1):
-            import matplotlib.pyplot as plt
-            plt.matshow(ms_to_plot)
-            plt.show()
-
-##------------------------------------------------------------------
-   
-    tortuosity_descriptor = Tortuosity()
-    singlephase_descriptor = tortuosity_descriptor.make_singlephase_descriptor(phase_of_interest=[0], 
-                                                                               direction_mode='positive', 
-                                                                               connectivity='corners')
-
-    logging.info(f'Starting tortuosity calculation with microstructure of shape: {ms.shape}')
-    mean_tort = singlephase_descriptor(ms)
-    print('\n -----------------------------')
-    print(f'tortuosity: {mean_tort}')
-    logging.info(f"Standalone execution completed successfully. Result for Mean Tortuosity: {mean_tort}")
-    logging.info("="*60)
-
-##------------------------------------------------------------------
-
-    # import pickle
-    # # Step 2: Open the pickle file
-    # result_folder = '/home/sobczyk/Dokumente/MCRpy/results' 
-    # pickle_filename = os.path.join(result_folder,'BlockingLayer_X_32x32x32_characterization.pickle')
-    # with open(pickle_filename, 'rb') as file:  # Replace 'filename.pkl' with your filepath
-    #     # Step 3: Load the data
-    #     data = pickle.load(file)
-    # print(f"data: {data}")
-    # print(f'ms.shape: {ms.shape}')
-
-    # print(f'ms: {ms}, size: {ms.size}')
