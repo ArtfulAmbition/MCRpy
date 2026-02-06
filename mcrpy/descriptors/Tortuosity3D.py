@@ -25,21 +25,21 @@ if disable_tf_warnings:
 
 import tensorflow as tf
 from mcrpy.src import descriptor_factory
-from mcrpy.descriptors.PhaseDescriptor import PhaseDescriptor
 from numpy.typing import NDArray
 from typing import Any, Union
 import numpy as np
-from skimage.morphology import medial_axis, skeletonize
+from skimage.morphology import skeletonize
 from mcrpy.descriptors.Percolation import get_connected_phases_of_interest, get_labeled_ms
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import dijkstra as sp_dijkstra
-from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions, slice_ndarray, plot_slices
+from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
 import logging
 from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
 from mcrpy.view import view
 import SimpleITK as sitk
 
-tf.config.run_functions_eagerly(True)
+# tf.config.run_functions_eagerly(True)
+
 
 class Pathfinder():
     def __init__(self,
@@ -71,7 +71,6 @@ class Pathfinder():
         assert isinstance(self.direction_list, list), "Error: direction must be a list of ints." 
         assert all(isinstance(dir, int) and 0 <= dir < self.dimensionality 
                    for dir in self.direction_list), f"All elements of direction_list must be positve integers smaller than the dimensionality {self.dimensionality}.)"
-        # fix voxel_dimension accidentally being a 1-tuple if trailing comma existed
         if isinstance(voxel_dimension, tuple) and len(voxel_dimension) == 1 and isinstance(voxel_dimension[0], tuple):
             self.voxel_dimension = voxel_dimension[0]
         else:
@@ -354,8 +353,11 @@ class Tortuosity(PhaseDescriptor3D):
             logging.info('Entering DSPSM function.')
             
             pathfinder = Pathfinder(ms_phase_of_interest=ms_phase_of_interest,
+                                    connectivity=connectivity,
                                     direction_list=directions, 
-                                    direction_mode=direction_mode) 
+                                    direction_mode=direction_mode,
+                                    voxel_dimension=voxel_dimension)
+                                     
 
             return pathfinder.tortuosity_list
         
