@@ -32,7 +32,7 @@ use_multigrid = False
 use_multiphase = True
 do_paraview_plot = False
 
-limit_to = 8    # maximale Laenge des Vektors in x oder y-Richtung for example for FFTCorrelations3D.
+limit_to = 2    # maximale Laenge des Vektors in x oder y-Richtung for example for FFTCorrelations3D.
                 # if used on singlegrid --> only short-range descriptor, else also long-range.
 
 # Characterization of the MS using all descriptors
@@ -46,8 +46,8 @@ characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=desi
 
 print("Load similar 3D microstructure ...")
 #ms2D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_2D_20x20.npy")
-#ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy")
-# ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy")
+#ms = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy",use_multiphase=use_multiphase)
+# ms = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy",use_multiphase=use_multiphase)
 # ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_3D_2x2x2.npy",use_multiphase=False)
 #ms3D = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_8x8x8.npy",use_multiphase=False)
 #ms = mcrpy.load("/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",use_multiphase=use_multiphase)
@@ -85,20 +85,20 @@ reconstruction_settings3D = mcrpy.ReconstructionSettings(descriptor_types=desire
                                     logging_level=logging.INFO)
 
 
-print("="*60)
-print("Reconstruct microstructure...")
-convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (8, 8, 8), 
-                                          settings=reconstruction_settings3D,
-                                          )
+# print("="*60)
+# print("Reconstruct microstructure...")
+# convergence_data3D, ms_reconstruct3D = mcrpy.reconstruct(description3D, (8, 8, 8), 
+#                                           settings=reconstruction_settings3D,
+#                                           )
 
-view(convergence_data3D)
+# view(convergence_data3D)
 
-# view(ms_reconstruct3D, )
-print("characterization of reconstructed ms:")
-ms_result = convergence_data3D['raw_data'][-1]
-description3D = mcrpy.characterize(ms_result, characterization_settings)
-print("="*60)
-print(f"characterization: {description3D}")
+# # view(ms_reconstruct3D, )
+# print("characterization of reconstructed ms:")
+# ms_result = convergence_data3D['raw_data'][-1]
+# description3D = mcrpy.characterize(ms_result, characterization_settings)
+# print("="*60)
+# print(f"characterization: {description3D}")
 
-logging.info("="*60)
-logging.shutdown() 
+# logging.info("="*60)
+# logging.shutdown() 

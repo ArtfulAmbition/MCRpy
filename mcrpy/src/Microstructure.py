@@ -342,3 +342,4 @@ class Microstructure:
         assert self.has_phases
         slice_to_decode = self.get_slice(dimension, slice_index)
         return self.decode_phase_array(slice_to_decode, specific_phase=specific_phase, raw=raw)
+    

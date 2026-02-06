@@ -348,7 +348,11 @@ class Tortuosity(PhaseDescriptor3D):
 
             return pathfinder.tortuosity_list
         
-        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], directions: list, method='medial_axis', do_paraview_plot:bool=True ):
+        def SSPSM(ms_phase_of_interest: NDArray[np.bool_], 
+                  directions: list, 
+                  method:str='skeletonize', 
+                  directional_invariant:bool=True,
+                  do_paraview_plot:bool=True):
             '''
             Skeleton Shortest Path Searching Method
             '''     
@@ -356,15 +360,36 @@ class Tortuosity(PhaseDescriptor3D):
 
             if method == 'medial_axis':
 
-                # using SimpleITK:
-                sitk_image = sitk.GetImageFromArray(ms_phase_of_interest.astype(np.uint8))
-                distance_transform = sitk.SignedMaurerDistanceMap(sitk_image, 
-                                                                  insideIsPositive=True, 
-                                                                  squaredDistance=False, 
-                                                                  useImageSpacing=False)
-                medial_axis = sitk.BinaryThinning(distance_transform > 0)
-                medial_axis_array = sitk.GetArrayFromImage(medial_axis)
-                skeleton_ms = medial_axis_array.astype(bool)
+                def rotate3d_90_degrees(array3d, axis:int, k=1): #axis: 0=x, 1=y, 2=z
+                    assert len(array3d.shape)==3
+                def perform_directional_medial_axis(bool_array):
+                    print('starting medial axis')
+                    # using SimpleITK.
+                    # It can be shown, that this computatation is dependent on the axes of the array.  
+                    sitk_image = sitk.GetImageFromArray(bool_array.astype(np.uint8))
+                    distance_transform = sitk.SignedMaurerDistanceMap(sitk_image, 
+                                                                    insideIsPositive=True, 
+                                                                    squaredDistance=True, 
+                                                                    useImageSpacing=False)
+                    medial_axis = sitk.BinaryThinning(distance_transform > 0)
+                    medial_axis_array = sitk.GetArrayFromImage(medial_axis)
+                    skeleton_ms = medial_axis_array.astype(bool)
+                    print('finished medial axis')
+                    return skeleton_ms
+
+                if directional_invariant:
+                    #to make the medial axis invariant on how the array is given to the algorithm, 
+                    #the algorithm is performed for all possible rotated arrays and the results are combined.
+                    assert len(ms_phase_of_interest.shape)==3
+                    skeleton_ms1 = np.rot90(perform_directional_medial_axis(np.rot90(ms_phase_of_interest,axes=(1,2))),axes=(1,2),k=-1)
+                    skeleton_ms2 = np.rot90(perform_directional_medial_axis(np.rot90(ms_phase_of_interest,axes=(0,1))),axes=(0,1),k=-1)
+                    skeleton_ms3 = np.rot90(perform_directional_medial_axis(np.rot90(ms_phase_of_interest,axes=(0,2))),axes=(0,2),k=-1)
+                    arrays = np.array([skeleton_ms1, skeleton_ms2, skeleton_ms3])
+                    skeleton_ms = np.logical_or.reduce(arrays)
+                else:
+                    skeleton_ms = perform_directional_medial_axis(ms_phase_of_interest)
+
+
                 #raise NotImplementedError('Error: Method "medial_axis" not yet implemented in SSPSM.')
                 
                 # dimensionality = len(ms_phase_of_interest.shape)
@@ -396,7 +421,13 @@ class Tortuosity(PhaseDescriptor3D):
                 #         plt.show()
             
             elif method == 'skeletonize':
+
                 skeleton_ms = skeletonize(ms_phase_of_interest)
+                for ii in [0,1,2,-1,-2,-3]:
+                    skeleton_ms[ii,:,:] = skeletonize(ms_phase_of_interest[ii,:,:])
+                    skeleton_ms[:,ii,:] = skeletonize(ms_phase_of_interest[:,ii,:])
+                    skeleton_ms[:,:,ii] = skeletonize(ms_phase_of_interest[:,:,ii])
+
             else:
                 raise NotImplementedError('Error: Method {method} not implemented in SSPSM.')
 
