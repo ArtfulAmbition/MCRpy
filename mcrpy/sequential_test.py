@@ -35,6 +35,7 @@ class MultiStepOptimizer:
                  verbose:bool=False,
                  save_files:bool=False,
                  goal_ms_shape:tuple=None,
+                 optimizer:str =None,
                  tolerance=1e-4,
                  initial_ms:Union[str,Microstructure] = None, # path or Microstructure of the ms used as starting point for optimization
                  info:str='',
@@ -60,6 +61,12 @@ class MultiStepOptimizer:
         self.descriptor_list = descriptor_list
         self.map_descriptor_list()
         
+        if optimizer:
+            self.optimizer = optimizer
+        elif self.is_differentiable:
+            self.optimizer = "LBFGSB"
+        elif not self.is_differentiable:
+            self.optimizer = "SimulatedAnnealing"
 
         self.initial_ms = self.get_microstructure(initial_ms)
         self.goal_ms = self.get_microstructure(goal_ms)
@@ -95,7 +102,6 @@ class MultiStepOptimizer:
         else:
             self.reconstruction_settings = reconstruction_settings
         
-
     def get_microstructure(self, ms:Union[str,Microstructure]):
         if isinstance(ms,str):
             ms_path = ms
@@ -140,10 +146,10 @@ class MultiStepOptimizer:
             descriptor_types=self.descriptor_list,
             use_multiphase=self.use_multiphase, 
             max_iter=self.max_iter,
-            full_3d=False,
+            full_3d=self.full_3d,
             limit_to=8,
             convergence_data_steps=1, outfile_data_steps=1,
-            optimizer_type="LBFGSB",
+            optimizer_type=self.optimizer,
             #optimizer_type="SimulatedAnnealing",
             use_multigrid_descriptor=self.use_multigrid,
             use_multigrid_reconstruction=self.use_multigrid,
@@ -192,7 +198,7 @@ class MultiStepOptimizer:
             "VolumeFractions": {"2D": "VolumeFractions", "3D": "VolumeFractions3D"},
             "TPB": {"2D": "TPB", "3D": "TPB3D"},
             "DPB": {"2D": "DPB", "3D": "DPB3D"},
-            "Percolation": {"2D": None, "3D": "Percolation3D"},
+            "Percolation": {"2D": None, "3D": "Percolation"},
             "FFTCorrelations": {"2D": "FFTCorrelations", "3D": "FFTCorrelations3D"}
             }
         
@@ -240,20 +246,32 @@ desired_descriptor_list = ['Tortuosity3D',
                     'Percolation',
                     'FFTCorrelations3D']
 
-diff_2D_opimizer = MultiStepOptimizer(full_3d=False,
-                                      goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy",
-                                      is_differentiable=True,
+diff_3D_opimizer = MultiStepOptimizer(full_3d=True,
+                                      goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
+                                      is_differentiable=False,
+                                      use_multigrid=False,
+                                      use_multiphase=True,
                                       descriptor_list=desired_descriptor_list,
-                                      goal_ms_shape=(10,10,10),
-                                      max_iter=1000,
+                                      goal_ms_shape=(20,20,20),
+                                      max_iter=10,
                                       population_size=10,
                                       verbose=True)
 
-diff_2D_opimizer.get_characterization_goal(verbose=True)
-diff_2D_opimizer.reconstruct()
-print(diff_2D_opimizer.result_ms)
+diff_3D_opimizer.get_characterization_goal(verbose=True)
+diff_3D_opimizer.reconstruct()
+diff_3D_opimizer.view_convergence_data()
+diff_3D_opimizer.view_result_ms()
 
-
+# diff_3D_opimizer = MultiStepOptimizer(full_3d=False,
+#                                       goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
+#                                       is_differentiable=True,
+#                                       use_multigrid=False,
+#                                       use_multiphase=True,
+#                                       descriptor_list=desired_descriptor_list,
+#                                       goal_ms_shape=(20,20,20),
+#                                       max_iter=10,
+#                                       population_size=10,
+#                                       verbose=True)
 
 
 
