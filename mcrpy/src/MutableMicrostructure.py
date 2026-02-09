@@ -145,6 +145,7 @@ class MutableMicrostructure(Microstructure):
         #     return tuple([location_1d[chosen_possibility] for location_1d in possible_locations])
 
         logging.info('start adjusting volume fractions')
+        print('start adjusting volume fractions')
         neighbor_offset = 2.9
         with self.use_multiphase_encoding() as x:
             if isinstance(volume_fractions, tuple):

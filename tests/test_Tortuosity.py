@@ -47,6 +47,18 @@ class TestTortuosity(unittest.TestCase):
         self.microstructures['BlockingLayer_X_20x20x20'] = ms
         np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy', self.microstructures['BlockingLayer_X_20x20x20'])
 
+        ms = np.random.randint(0,high=2,size=(20, 20, 20))
+        ms = ms.astype(int)
+        self.microstructures['Random_20x20x20'] = ms
+        np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_20x20x20.npy', self.microstructures['Random_20x20x20'])
+
+        ms = np.random.randint(0,high=2,size=(20, 20, 20))
+        ms = ms.astype(int)
+        self.microstructures['Random2_20x20x20'] = ms
+        np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random2_20x20x20.npy', self.microstructures['Random2_20x20x20'])
+
+
+
         ms = np.ones((3,3,3))
         ms[0,0,0] = 0
         ms[1,1,1] = 0
