@@ -258,7 +258,6 @@ class DMCR:
     def initialize_microstructure(self, previous_solution: Microstructure = None):
         """Initialize the ms by sampling randomly or upsampling previous solution."""
         ms_class = MutableMicrostructure if  optimizer_factory.optimizer_classes[self.optimizer_type].swaps_pixels else Microstructure
-        print(ms_class)
         if previous_solution is None:
             loc = 0.5
             img = np.random.normal(loc=loc, scale=0.1, size=self.desired_shape_extended)
@@ -302,9 +301,6 @@ class DMCR:
             self.convergence_data['raw_data'].append(copy.deepcopy(ms))
 
             characterization = mcrpy.characterize(ms, char_settings)
-            tort = characterization.get('Tortuosity3D')
-            vf = characterization.get('VolumeFractions3D')
-            print(f'Characterization: Tortuosity3D = {tort}, VolumeFractions3D = {vf}')
 
         if n_iter % self.outfile_data_steps == 0 and (
                 n_iter > 0 or self.outfile_data_steps < np.inf):

@@ -306,7 +306,6 @@ class Tortuosity(PhaseDescriptor3D):
 
     @staticmethod
     def make_singlephase_descriptor(
-        
         connectivity : Union[int,str] = 'corners', # implemented connectivities: only via sides, only via sides and edges, and via sides, edges and corners. 
         # for connectivity only via sides --> possible arguments: ['sides' (for 2D and 3D), 6 (for 3D), 4 (for 2D)], 
         # for connectivity only via sides and edges --> possible arguments: ['edges' (for 2D and 3D), 18 (for 3D), 4 (for 2D)] 
@@ -376,7 +375,6 @@ class Tortuosity(PhaseDescriptor3D):
                 def rotate3d_90_degrees(array3d, axis:int, k=1): #axis: 0=x, 1=y, 2=z
                     assert len(array3d.shape)==3
                 def perform_directional_medial_axis(bool_array):
-                    print('starting medial axis')
                     # using SimpleITK.
                     # It can be shown, that this computatation is dependent on the axes of the array.  
                     sitk_image = sitk.GetImageFromArray(bool_array.astype(np.uint8))
@@ -387,7 +385,6 @@ class Tortuosity(PhaseDescriptor3D):
                     medial_axis = sitk.BinaryThinning(distance_transform > 0)
                     medial_axis_array = sitk.GetArrayFromImage(medial_axis)
                     skeleton_ms = medial_axis_array.astype(bool)
-                    print('finished medial axis')
                     return skeleton_ms
 
                 if directional_invariant:
