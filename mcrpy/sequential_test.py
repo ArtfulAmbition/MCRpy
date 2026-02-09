@@ -241,7 +241,7 @@ class MultiStepOptimizer:
 ##### Define the list of desired descriptors and define neccesary parameters:
 desired_descriptor_list = ['Tortuosity3D',
                     'VolumeFractions3D',
-                    #'TPB3D',
+                    'TPB3D',
                     'DPB3D',
                     'Percolation',
                     'FFTCorrelations3D']
