@@ -34,10 +34,10 @@ class MultiStepOptimizer:
                  use_multiphase=True,
                  verbose:bool=False,
                  save_files:bool=False,
+                 goal_ms_shape:tuple=None,
                  tolerance=1e-4,
                  initial_ms:Union[str,Microstructure] = None, # path or Microstructure of the ms used as starting point for optimization
                  info:str='',
-                 result_ms_shape=None,
                  plot_intial_ms:bool=False,
                  plot_result_ms:bool=False,
                  plot_convergence_data:bool=False,
@@ -50,6 +50,7 @@ class MultiStepOptimizer:
         self.is_differentiable=is_differentiable
         self.full_3d = full_3d
         self.info=info
+        self.goal_ms_shape = goal_ms_shape
         self.verbose = verbose
         self.result_ms = None
         self.use_multigrid = use_multigrid
@@ -63,12 +64,18 @@ class MultiStepOptimizer:
         self.initial_ms = self.get_microstructure(initial_ms)
         self.goal_ms = self.get_microstructure(goal_ms)
 
-        if not result_ms_shape:
+        if not goal_ms_shape:
             if self.initial_ms:
                 self.goal_ms_shape = self.initial_ms.spatial_shape
             else:
-                raise AssertionError('Either a result_ms_shape must be given or an initial_ms to derive the output size from.')
-            
+                raise AssertionError('Either a result_ms_shape must be given or an initial_ms to derive the output ms size.')
+        elif goal_ms_shape:
+            if not self.initial_ms:
+                self.goal_ms_shape = goal_ms_shape
+            else:
+                raise AssertionError('Only a result_ms_shape or an initial_ms may be prescribed to derive the output ms size.')
+
+
         if self.verbose:
             if self.initial_ms:
                 print(f'Using initial ms with shape {self.initial_ms.spatial_shape}')
@@ -237,9 +244,14 @@ diff_2D_opimizer = MultiStepOptimizer(full_3d=False,
                                       goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_20x20x20.npy",
                                       is_differentiable=True,
                                       descriptor_list=desired_descriptor_list,
+                                      goal_ms_shape=(10,10,10),
+                                      max_iter=1000,
+                                      population_size=10,
                                       verbose=True)
 
 diff_2D_opimizer.get_characterization_goal(verbose=True)
+diff_2D_opimizer.reconstruct()
+print(diff_2D_opimizer.result_ms)
 
 
 
@@ -302,16 +314,16 @@ diff_2D_opimizer.get_characterization_goal(verbose=True)
 #             tolerance=1e-4,
 #             logging_level=logging.INFO)
 
-if initial_microstructure:
-    print(f"Reconstruct microstructure with shape {initial_microstructure.spatial_shape}...")
-else:
-    print(f"Reconstruct microstructure with shape {ms_to_reconstruct.spatial_shape}...")
+# if initial_microstructure:
+#     print(f"Reconstruct microstructure with shape {initial_microstructure.spatial_shape}...")
+# else:
+#     print(f"Reconstruct microstructure with shape {ms_to_reconstruct.spatial_shape}...")
 
-convergence_data2D, ms_reconstruct2D = mcrpy.reconstruct(description2D, ms_to_reconstruct_shape, 
-                                          settings=reconstruction_settings2D_differentiable,
-                                          initial_microstructure=initial_microstructure
-                                          )
-view(convergence_data2D)
+# convergence_data2D, ms_reconstruct2D = mcrpy.reconstruct(description2D, ms_to_reconstruct_shape, 
+#                                           settings=reconstruction_settings2D_differentiable,
+#                                           initial_microstructure=initial_microstructure
+#                                           )
+# view(convergence_data2D)
 
 
 
