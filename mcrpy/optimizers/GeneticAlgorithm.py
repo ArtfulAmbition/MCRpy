@@ -179,7 +179,7 @@ class GeneticAlgorithm(Optimizer):
                  callback: callable = None, 
                  loss: callable = None,
                  seed: int = None, 
-                 n_phases: int = 2, # zero and one
+                 n_phases: int = None, # zero and one
                  tolerance: float = 0.00001,
                  use_multiphase: bool = False, 
                  mutation_rule: str = 'PM',
@@ -194,7 +194,7 @@ class GeneticAlgorithm(Optimizer):
         self.population_size = population_size
         self.reconstruction_callback = callback
         self.seed = seed
-        self.n_phases = int(n_phases)
+        self.n_phases = n_phases
         self.target_loss = tolerance
         self.use_multiphase = bool(use_multiphase)
         self.loss = loss
@@ -213,6 +213,7 @@ class GeneticAlgorithm(Optimizer):
     def set_up_pymoo(self):
 
         ms_shape = self.ms.spatial_shape
+        self.n_phases = self.ms.n_phases
         n_elements = np.prod(ms_shape) #number of elements of each individual
         xl = np.zeros(n_elements) # lower bound for variables in function to be evaluated
         xu = np.full(n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
@@ -250,7 +251,11 @@ class GeneticAlgorithm(Optimizer):
 
         self.sampling=DiverseRandomSampling(initial_ms=self.ms)
         self.crossover = SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair())
-        self.mutation = PM(prob=0.5, eta=1,vtype=float, repair=RoundingRepair())
+        # by default use polynomial mutation PM; allow switching to PhaseBitflip via mutation_rule
+        if str(self.mutation_rule).lower() in {'phasebitflip', 'phase_bitflip', 'bitflip'}:
+            self.mutation = PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=self.n_phases)
+        else:
+            self.mutation = PM(prob=0.5, eta=1, vtype=float, repair=RoundingRepair())
 
         self.algorithm = GA(
                 pop_size=self.population_size,
@@ -277,7 +282,7 @@ class GeneticAlgorithm(Optimizer):
 
         while self.n_iter < self.max_iter:
             if self.iters_since_last_accept >= self.conv_iter:
-                logging.info('converged - no change since {self.iters_since_last_accept} iterations')
+                logging.info(f'converged - no change since {self.iters_since_last_accept} iterations')
                 break
             if self.current_loss <= self.tolerance:
                 logging.info('reached tolerance')
