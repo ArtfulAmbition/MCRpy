@@ -61,7 +61,7 @@ class DiverseRandomSampling(Sampling):
         """Generate diverse initial population with mixed phases.
         Optionally ensures connectivity for phase_of_interest.
         """
-        
+
         def calculate_X():
             n_phases = int(problem.xu[0]) + 1
             
@@ -85,10 +85,13 @@ class DiverseRandomSampling(Sampling):
             
             if self.initial_ms:
                 # if an initial microstructure is given, replace one of the individuums with it 
-                arr = self.initial_ms.get_full_field(phase_number=0).numpy()
-                if arr.dtype!=int:
-                    arr = np.round(arr).astype(int)
-                X[0] = arr.flatten()
+                if self.initial_ms.has_phases:
+                    microstructure = self.initial_ms.decode_phases()
+                else:
+                    microstructure = self.initial_ms.get_orientation_field().numpy()
+
+                X[0] = microstructure.flatten()
+
             
             return X
         
@@ -182,7 +185,7 @@ class GeneticAlgorithm(Optimizer):
                  n_phases: int = None, # zero and one
                  tolerance: float = 0.00001,
                  use_multiphase: bool = False, 
-                 mutation_rule: str = 'PM',
+                 mutation_rule: str = 'phasebitflip', # phasebitflip or PM
                  use_orientations: bool = False,
                  is_3D: bool = False,
                  **kwargs):

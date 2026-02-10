@@ -132,6 +132,9 @@ class MultiStepOptimizer:
     def view_result_ms(self):
         view(self.result_ms,save_as='result_MS'+self.info)
 
+    def view_goal_ms(self):
+        view(self.goal_ms,save_as='goal_MS'+self.info)
+
     def setup_default_characterization_settings(self):
 
         self.characterization_settings = mcrpy.CharacterizationSettings(descriptor_types=self.descriptor_list,
@@ -150,7 +153,7 @@ class MultiStepOptimizer:
             max_iter=self.max_iter,
             full_3d=self.full_3d,
             limit_to=8,
-            convergence_data_steps=1, outfile_data_steps=1,
+            convergence_data_steps=1, outfile_data_steps=20,
             optimizer_type=self.optimizer,
             #optimizer_type="SimulatedAnnealing",
             use_multigrid_descriptor=self.use_multigrid,
@@ -278,38 +281,40 @@ desired_descriptor_list = [
                     'VolumeFractions3D',
                     'TPB3D',
                     'DPB3D',
-                    # 'Percolation',
-                    # 'FFTCorrelations3D'
+                    'Percolation',
+                    'FFTCorrelations3D'
                     ]
 
 datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
-goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Phases_20x20x20.npy"
+goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy"
 
-# diff_2D_optimizer = MultiStepOptimizer(full_3d=False,
-#                                       goal_ms=goal_ms_path,
-#                                       is_differentiable=True,
-#                                       use_multigrid=False,
-#                                       use_multiphase=True,
-#                                       info='2D_'+ datetime_string + '_',
-#                                       descriptor_list=desired_descriptor_list,
-#                                       goal_ms_shape=(20,20,20),
-#                                       max_iter=30,
-#                                       population_size=1000,
-#                                       verbose=True)
+diff_2D_optimizer = MultiStepOptimizer(full_3d=False,
+                                      goal_ms=goal_ms_path,
+                                      is_differentiable=True,
+                                      use_multigrid=False,
+                                      use_multiphase=True,
+                                      info='2D_'+ datetime_string,
+                                      descriptor_list=desired_descriptor_list,
+                                      goal_ms_shape=(20,20,20),
+                                      max_iter=1,
+                                      population_size=1000,
+                                      verbose=True)
 
-# diff_2D_optimizer.characterize(verbose=True)
-# diff_2D_optimizer.reconstruct()
-# diff_2D_optimizer.view_convergence_data()
-# # diff_2D_optimizer.view_result_ms()
-# # diff_2D_optimizer.to_pickle()
-# result_ms = diff_2D_optimizer.result_ms
+# diff_2D_optimizer.view_goal_ms()
+diff_2D_optimizer.characterize(verbose=True)
+diff_2D_optimizer.reconstruct()
+diff_2D_optimizer.view_convergence_data()
+
+# diff_2D_optimizer.view_result_ms()
+# diff_2D_optimizer.to_pickle()
+result_ms = diff_2D_optimizer.result_ms
 
 # diff_2D_optimizer2 = MultiStepOptimizer(full_3d=False,
 #                                       goal_ms=goal_ms_path,
 #                                       is_differentiable=True,
 #                                       use_multigrid=False,
 #                                       use_multiphase=True,
-#                                       info='2D_2_'+ datetime_string + '_',
+#                                       info='2D_2_'+ datetime_string,
 #                                       descriptor_list=desired_descriptor_list,
 #                                       #goal_ms_shape=(20,20,20),
 #                                       max_iter=20,
@@ -325,6 +330,27 @@ goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Ph
 # result_ms = diff_2D_optimizer2.result_ms
 
 
+diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
+                                      goal_ms=goal_ms_path,
+                                      is_differentiable=False,
+                                      use_multigrid=False,
+                                      use_multiphase=True,
+                                      info='3D' + datetime_string,
+                                      descriptor_list=desired_descriptor_list,
+                                      optimizer="GeneticAlgorithm",
+                                      max_iter=20,
+                                      population_size=20,
+                                      #initial_ms=result_ms,
+                                      goal_ms_shape=(20,20,20),
+                                      verbose=True)
+
+diff_3D_optimizer.characterize(verbose=True)
+diff_3D_optimizer.reconstruct()
+diff_3D_optimizer.view_convergence_data()
+# diff_3D_opimizer.view_result_ms()
+# diff_3D_optimizer.view_initial_ms()
+diff_3D_optimizer.to_pickle()
+
 # diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
 #                                       goal_ms=goal_ms_path,
 #                                       is_differentiable=False,
@@ -333,9 +359,11 @@ goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Ph
 #                                       info='3D' + datetime_string + '_',
 #                                       descriptor_list=desired_descriptor_list,
 #                                       optimizer="GeneticAlgorithm",
-#                                       max_iter=50,
-#                                       population_size=1000,
-#                                       initial_ms=result_ms,
+#                                       max_iter=100,
+#                                       tolerance=1e-7,
+#                                       population_size=20,
+#                                       initial_ms=None,
+#                                       goal_ms_shape=(20,20,20),
 #                                       verbose=True)
 
 # diff_3D_optimizer.characterize(verbose=True)
@@ -344,25 +372,3 @@ goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Ph
 # # diff_3D_opimizer.view_result_ms()
 # diff_3D_optimizer.view_initial_ms()
 # diff_3D_optimizer.to_pickle()
-
-diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
-                                      goal_ms=goal_ms_path,
-                                      is_differentiable=False,
-                                      use_multigrid=False,
-                                      use_multiphase=True,
-                                      info='3D' + datetime_string + '_',
-                                      descriptor_list=desired_descriptor_list,
-                                      optimizer="GeneticAlgorithm",
-                                      max_iter=100,
-                                      tolerance=1e-7,
-                                      population_size=20,
-                                      initial_ms=None,
-                                      goal_ms_shape=(20,20,20),
-                                      verbose=True)
-
-diff_3D_optimizer.characterize(verbose=True)
-diff_3D_optimizer.reconstruct()
-diff_3D_optimizer.view_convergence_data()
-# diff_3D_opimizer.view_result_ms()
-diff_3D_optimizer.view_initial_ms()
-diff_3D_optimizer.to_pickle()

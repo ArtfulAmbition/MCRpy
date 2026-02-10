@@ -59,6 +59,14 @@ class TestTortuosity(unittest.TestCase):
         self.microstructures['Random_3Phases_20x20x20'] = ms
         np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Phases_20x20x20.npy', self.microstructures['Random_3Phases_20x20x20'])
 
+        ms = np.zeros((20, 20, 20))
+        for ii in range(0,20,2):
+            ms[:,ii,:] = 1
+            ms[ii,ii,:] = 2
+        ms = ms.astype(int)
+        self.microstructures['Directed_3Phases_20x20x20'] = ms
+        np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy', self.microstructures['Directed_3Phases_20x20x20'])
+
 
         ms = np.ones((3,3,3))
         ms[0,0,0] = 0
