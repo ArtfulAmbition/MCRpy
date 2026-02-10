@@ -24,6 +24,7 @@ class MultiStepOptimizer:
     # Wrapper class to obtain a desired MS from a multistep sequence of characterizations and reconstructions
     def __init__(self,
                  goal_ms:Union[str,Microstructure]=None, # path or Microstructure of the ms to resemble after optimization
+                 goal_ms_shape:tuple=None, # desired shape of the MS to reconstruct. May differ from the input goal_ms shape. 
                  characterization_goal:dict = None,
                  full_3d:bool=True,
                  max_iter:int = 100,
@@ -35,20 +36,11 @@ class MultiStepOptimizer:
                  use_multigrid=False,
                  use_multiphase=True,
                  verbose:bool=False,
-                 save_files:bool=False,
-                 goal_ms_shape:tuple=None,
                  optimizer:str =None,
                  tolerance=1e-4,
                  initial_ms:Union[str,Microstructure] = None, # path or Microstructure of the ms used as starting point for optimization
                  info:str='',
-                 plot_intial_ms:bool=False,
-                 plot_result_ms:bool=False,
-                 plot_convergence_data:bool=False,
                  **kwargs):
-        self.plot_intial_ms = plot_intial_ms
-        self.plot_result_ms = plot_result_ms
-        self.plot_convergence_data = plot_convergence_data
-        self.save_files = save_files
         self.tolerance = tolerance,
         self.population_size = population_size
         self.max_iter = max_iter
@@ -163,7 +155,7 @@ class MultiStepOptimizer:
             tolerance=self.tolerance,
             logging_level=logging.INFO)
 
-    def get_characterization_goal(self, redo=True, verbose=None):
+    def characterize(self, redo=True, verbose=None):
         if verbose==None:
             verbose = self.verbose
 
@@ -189,12 +181,8 @@ class MultiStepOptimizer:
                                         self.characterization_goal,
                                         self.goal_ms_shape, 
                                         settings=self.reconstruction_settings,
-                                        initial_microstructure=self.initial_ms)
-        if self.plot_convergence_data:
-            self.view_convergence_data()
-        if self.plot_result_ms:
-            self.view_result_ms()
-        
+                                        initial_microstructure=self.initial_ms)        
+    
     def view_convergence_data(self):
         view(self.convergence_data)
 
@@ -282,49 +270,71 @@ class MultiStepOptimizer:
 ##### Define the list of desired descriptors and define neccesary parameters:
 desired_descriptor_list = ['Tortuosity3D',
                     'VolumeFractions3D',
-                    #'TPB3D',
+                    'TPB3D',
                     'DPB3D',
                     'Percolation',
                     'FFTCorrelations3D']
 
 datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
+goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Phases_20x20x20.npy"
 
-diff_2D_opimizer = MultiStepOptimizer(full_3d=False,
-                                      goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
+diff_2D_optimizer = MultiStepOptimizer(full_3d=False,
+                                      goal_ms=goal_ms_path,
                                       is_differentiable=True,
                                       use_multigrid=False,
                                       use_multiphase=True,
-                                      info='2D'+ datetime_string + '_',
+                                      info='2D_'+ datetime_string + '_',
                                       descriptor_list=desired_descriptor_list,
                                       goal_ms_shape=(20,20,20),
-                                      max_iter=10,
+                                      max_iter=30,
+                                      population_size=1000,
+                                      verbose=True)
+
+diff_2D_optimizer.characterize(verbose=True)
+diff_2D_optimizer.reconstruct()
+diff_2D_optimizer.view_convergence_data()
+# diff_2D_optimizer.view_result_ms()
+# diff_2D_optimizer.to_pickle()
+result_ms = diff_2D_optimizer.result_ms
+
+diff_2D_optimizer2 = MultiStepOptimizer(full_3d=False,
+                                      goal_ms=goal_ms_path,
+                                      is_differentiable=True,
+                                      use_multigrid=False,
+                                      use_multiphase=True,
+                                      info='2D_2_'+ datetime_string + '_',
+                                      descriptor_list=desired_descriptor_list,
+                                      #goal_ms_shape=(20,20,20),
+                                      max_iter=20,
+                                      initial_ms=result_ms,
                                       population_size=10,
                                       verbose=True)
 
-diff_2D_opimizer.get_characterization_goal(verbose=True)
-diff_2D_opimizer.reconstruct()
-diff_2D_opimizer.view_convergence_data()
-diff_2D_opimizer.view_result_ms()
-diff_2D_opimizer.to_pickle()
+diff_2D_optimizer2.characterize(verbose=True)
+diff_2D_optimizer2.reconstruct()
+diff_2D_optimizer2.view_convergence_data()
+# diff_2D_optimizer2.view_result_ms()
+# diff_2D_optimizer2.to_pickle()
+result_ms = diff_2D_optimizer2.result_ms
 
 
-diff_3D_opimizer = MultiStepOptimizer(full_3d=True,
-                                      goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
+diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
+                                      goal_ms=goal_ms_path,
                                       is_differentiable=False,
                                       use_multigrid=False,
                                       use_multiphase=True,
                                       info='3D' + datetime_string + '_',
                                       descriptor_list=desired_descriptor_list,
-                                      optimizer="SimulatedAnnealing",
-                                      max_iter=5,
-                                      population_size=10,
-                                      initial_ms=diff_2D_opimizer.result_ms,
+                                      optimizer="GeneticAlgorithm",
+                                      max_iter=10,
+                                      population_size=1000,
+                                      initial_ms=result_ms,
                                       verbose=True)
 
-diff_3D_opimizer.get_characterization_goal(verbose=True)
-diff_3D_opimizer.reconstruct()
-diff_3D_opimizer.view_convergence_data()
+diff_3D_optimizer.characterize(verbose=True)
+diff_3D_optimizer.reconstruct()
+diff_3D_optimizer.view_convergence_data()
 # diff_3D_opimizer.view_result_ms()
-diff_3D_opimizer.view_initial_ms()
-diff_3D_opimizer.to_pickle()
+diff_3D_optimizer.view_initial_ms()
+diff_3D_optimizer.to_pickle()
 

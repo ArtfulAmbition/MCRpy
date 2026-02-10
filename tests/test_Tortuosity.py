@@ -1,9 +1,6 @@
 import unittest
 import numpy as np
-import mcrpy
-from example_data import example_ms, minimal_example_ms
 from mcrpy.descriptors.Tortuosity import Tortuosity
-from Langner_functions import DSPSM
 
 class TestTortuosity(unittest.TestCase):
     def setUp(self):
@@ -57,6 +54,10 @@ class TestTortuosity(unittest.TestCase):
         self.microstructures['Random2_20x20x20'] = ms
         np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random2_20x20x20.npy', self.microstructures['Random2_20x20x20'])
 
+        ms = np.random.randint(0,high=3,size=(20, 20, 20))
+        ms = ms.astype(int)
+        self.microstructures['Random_3Phases_20x20x20'] = ms
+        np.save('/home/sobczyk/Dokumente/MCRpy/example_microstructures/Random_3Phases_20x20x20.npy', self.microstructures['Random_3Phases_20x20x20'])
 
 
         ms = np.ones((3,3,3))
