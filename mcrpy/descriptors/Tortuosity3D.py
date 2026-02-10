@@ -503,10 +503,6 @@ class Tortuosity(PhaseDescriptor3D):
             return tf.cast(tf.constant(mean_tortuosity), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
-    # @staticmethod
-    # def make_multiphase_descriptor():
-    #     return 0
-
 def register() -> None:
     descriptor_factory.register("Tortuosity3D", Tortuosity)
 

@@ -8,6 +8,8 @@ from typing import Union
 from mcrpy.src.Microstructure import Microstructure
 from mcrpy.src.Settings import CharacterizationSettings, ReconstructionSettings
 import datetime
+import pickle
+import os
 
 ''' This code is for the purpose of performing a microstructure reconstruction 
 using differiable and non-differentiable descriptors. For performance reasons, 
@@ -43,11 +45,14 @@ class MultiStepOptimizer:
                  plot_result_ms:bool=False,
                  plot_convergence_data:bool=False,
                  **kwargs):
+        self.plot_intial_ms = plot_intial_ms
+        self.plot_result_ms = plot_result_ms
+        self.plot_convergence_data = plot_convergence_data
         self.save_files = save_files
         self.tolerance = tolerance,
         self.population_size = population_size
         self.max_iter = max_iter
-        self.datetime_string = ('{:%Y-%m-%d %H:%M:%S}'.format(datetime.datetime.now()))
+        self.datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
         self.is_differentiable=is_differentiable
         self.full_3d = full_3d
         self.info=info
@@ -185,6 +190,10 @@ class MultiStepOptimizer:
                                         self.goal_ms_shape, 
                                         settings=self.reconstruction_settings,
                                         initial_microstructure=self.initial_ms)
+        if self.plot_convergence_data:
+            self.view_convergence_data()
+        if self.plot_result_ms:
+            self.view_result_ms()
         
     def view_convergence_data(self):
         view(self.convergence_data)
@@ -238,37 +247,56 @@ class MultiStepOptimizer:
                             'Percolation',
                             'FFTCorrelations3D']
     
+    def to_pickle(self, filename:str=None, folder=None, full_path=None, add_date=False):
+        """Pickle the class instance to a file."""
+        default_folder = "/home/sobczyk/Dokumente/MCRpy/results/"
+        pickle_ending=".pkl"
+
+        if not filename:
+            filename = self.__class__.__name__
+
+        if self.info:
+            filename = filename + '_' + self.info 
+
+        if add_date:
+            filename = filename + '_' + self.datetime_string
+
+        if not folder:
+            folder = default_folder
+
+        if not full_path:
+            full_path = os.path.join(folder,filename)
+
+        full_path = full_path + pickle_ending if full_path[-4:]!=".pkl" else full_path
+        print(full_path)
+
+        with open(full_path, 'wb') as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def from_pickle(file_path):
+        """Load the class from a pickle file."""
+        with open(file_path, 'rb') as f:
+            return pickle.load(f)
+
 ##### Define the list of desired descriptors and define neccesary parameters:
 desired_descriptor_list = ['Tortuosity3D',
                     'VolumeFractions3D',
-                    'TPB3D',
+                    #'TPB3D',
                     'DPB3D',
                     'Percolation',
                     'FFTCorrelations3D']
 
-diff_3D_opimizer = MultiStepOptimizer(full_3d=True,
-                                      goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
-                                      is_differentiable=False,
-                                      use_multigrid=False,
-                                      use_multiphase=True,
-                                      descriptor_list=desired_descriptor_list,
-                                      goal_ms_shape=(20,20,20),
-                                      max_iter=10,
-                                      population_size=10,
-                                      verbose=True)
-
-diff_3D_opimizer.get_characterization_goal(verbose=True)
-diff_3D_opimizer.reconstruct()
-diff_3D_opimizer.view_convergence_data()
-diff_3D_opimizer.view_result_ms()
+datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
 
 diff_2D_opimizer = MultiStepOptimizer(full_3d=False,
                                       goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
                                       is_differentiable=True,
                                       use_multigrid=False,
                                       use_multiphase=True,
+                                      info='2D'+ datetime_string + '_',
                                       descriptor_list=desired_descriptor_list,
-                                      goal_ms_shape=(32,32,32),
+                                      goal_ms_shape=(20,20,20),
                                       max_iter=10,
                                       population_size=10,
                                       verbose=True)
@@ -277,3 +305,26 @@ diff_2D_opimizer.get_characterization_goal(verbose=True)
 diff_2D_opimizer.reconstruct()
 diff_2D_opimizer.view_convergence_data()
 diff_2D_opimizer.view_result_ms()
+diff_2D_opimizer.to_pickle()
+
+
+diff_3D_opimizer = MultiStepOptimizer(full_3d=True,
+                                      goal_ms="/home/sobczyk/Dokumente/MCRpy/example_microstructures/BlockingLayer_X_32x32x32.npy",
+                                      is_differentiable=False,
+                                      use_multigrid=False,
+                                      use_multiphase=True,
+                                      info='3D' + datetime_string + '_',
+                                      descriptor_list=desired_descriptor_list,
+                                      optimizer="SimulatedAnnealing",
+                                      max_iter=5,
+                                      population_size=10,
+                                      initial_ms=diff_2D_opimizer.result_ms,
+                                      verbose=True)
+
+diff_3D_opimizer.get_characterization_goal(verbose=True)
+diff_3D_opimizer.reconstruct()
+diff_3D_opimizer.view_convergence_data()
+# diff_3D_opimizer.view_result_ms()
+diff_3D_opimizer.view_initial_ms()
+diff_3D_opimizer.to_pickle()
+

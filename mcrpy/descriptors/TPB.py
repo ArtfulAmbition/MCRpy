@@ -44,6 +44,10 @@ class TPB(MultiPhaseDescriptor):
 
         @tf.function
         def periodic_variation(img: tf.Tensor) -> tf.Tensor:
+
+            if n_phases!=3:
+                return 0.0
+    
             imgs_tiled = [
                 tile_img(tf.gather(img, [n_phase], axis=-1)) for n_phase in range(n_phases)
                 ]
