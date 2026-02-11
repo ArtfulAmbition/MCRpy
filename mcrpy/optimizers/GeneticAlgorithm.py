@@ -21,6 +21,7 @@ from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 import logging
 import warnings
 
+
 # Suppress warnings
 warnings.filterwarnings("ignore")
 # Also set Python-side logger to ERROR for tensorflow logger (if TF is imported later)
@@ -48,7 +49,8 @@ def mpi_logging(message:str='', mode:str='default', end:str='\n'):
 
 class DiverseRandomSampling(Sampling):
     def __init__(self, 
-                 initial_ms:MutableMicrostructure):
+                 initial_ms:MutableMicrostructure=None
+                 ):
         super().__init__()
         self.initial_ms=initial_ms
     """Custom sampling to ensure phase diversity in initial population.
@@ -57,42 +59,66 @@ class DiverseRandomSampling(Sampling):
     to provide a better starting point for tortuosity optimization.
     """
     
-    def _do(self, problem, n_samples, start_with_connected_path=False, **kwargs):
+    def _do(self, problem, n_samples, **kwargs):
         """Generate diverse initial population with mixed phases.
         Optionally ensures connectivity for phase_of_interest.
         """
 
         def calculate_X():
+            #Here the notation X is used for the population matrix of shape (n_samples, problem.n_var) containing 
+            # the n_samples individuums x of shape. Each individuum has n_var genes. The genes are 
+            # represented by integers [0,n_phases].
             n_phases = int(problem.xu[0]) + 1
+            n_individuums = n_samples
+            genes_per_individuum = problem.n_var
+
+            def make_random_population(n_individuums=n_individuums,n_genes=genes_per_individuum):
+                random_population = np.random.randint(0,n_phases,size=(n_individuums, n_genes), dtype=int)
+                return random_population
             
-            if start_with_connected_path:
-                X = np.zeros((n_samples, problem.n_var), dtype=int)
-                
-                ms_shape = problem.ms_shape
-                dimensionality = len(ms_shape)
-                phase_of_interest = getattr(problem, 'phase_of_interest', 0)
-                direction = getattr(problem, 'direction', 0)
-                
-                for i in range(n_samples):
-                    # Generate random microstructure
-                    rand_ms_arr = np.random.randint(0, n_phases, ms_shape).astype(int)
-                    self._add_connected_path(rand_ms_arr, phase_of_interest, direction, dimensionality)
-                    
-                    X[i] = rand_ms_arr.flatten()
-                
-            else:
-                X = np.random.randint(0,n_phases,size=(n_samples, problem.n_var), dtype=int)
-            
-            if self.initial_ms:
-                # if an initial microstructure is given, replace one of the individuums with it 
-                if self.initial_ms.has_phases:
-                    microstructure = self.initial_ms.decode_phases()
+            def make_random_individuum():
+                random_individuum = np.random.randint(0,n_phases,size=problem.n_var, dtype=int)
+                return random_individuum
+
+            def decode_MS_as_individuum(ms:MutableMicrostructure):
+                # decodes a Microstructure object to an flattened np array 
+                if ms.has_phases:
+                    microstructure_arr = ms.decode_phases()
                 else:
-                    microstructure = self.initial_ms.get_orientation_field().numpy()
+                    raise NotImplementedError
+                individuum = microstructure_arr.flatten()
+                return individuum
 
-                X[0] = microstructure.flatten()
-
+            def create_individuum_as_random_variation_of_other_individuum(init_individuum):
+                # creates a random individum and adds a random part of the initial individuums genes to it
+                n_genes = len(init_individuum)
+                n_tranfered_genes=np.random.randint(n_genes,dtype=int)
+                boolean_mask = np.zeros(n_genes,dtype=bool)
+                boolean_mask[:n_tranfered_genes] = True
+                np.random.shuffle(boolean_mask)
+                derived_individuum = make_random_individuum()
+                derived_individuum[boolean_mask] = init_individuum[boolean_mask]
+                return derived_individuum
             
+            def create_population_as_random_variation_of_one_individuum(individuum_init,n_individuums=n_individuums,preserve_init_individuum:bool=True):
+                population = make_random_population(n_individuums=n_individuums,n_genes=len(individuum_init))
+                for ii in range(n_individuums):
+                    population[ii] = create_individuum_as_random_variation_of_other_individuum(individuum_init)
+
+                if preserve_init_individuum:
+                    population[0]=individuum_init
+
+                return population
+
+            if self.initial_ms:
+                individuum_init = decode_MS_as_individuum(self.initial_ms)
+                print('start creating population')
+                population = create_population_as_random_variation_of_one_individuum(individuum_init)
+                print('finished creating population')
+            else:
+                population = make_random_population()
+
+            X = population
             return X
         
 
@@ -221,7 +247,7 @@ class GeneticAlgorithm(Optimizer):
         xl = np.zeros(n_elements) # lower bound for variables in function to be evaluated
         xu = np.full(n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
 
-        class OpimizationProblem(Problem):          
+        class OptimizationProblem(Problem):          
             def __init__(self,call_loss, 
                          use_multiphase
                          ):
@@ -247,7 +273,7 @@ class GeneticAlgorithm(Optimizer):
                     fitness.append(val)
                     out['F'] = np.array(fitness).reshape(-1,1)
 
-        self.problem = OpimizationProblem(          
+        self.problem = OptimizationProblem(          
             call_loss=self.call_loss,
             use_multiphase=self.use_multiphase
             )

@@ -1,3 +1,11 @@
+import os
+# Configure TensorFlow/C++ logging and oneDNN before any TensorFlow import.
+# - TF_CPP_MIN_LOG_LEVEL: 0 = all logs, 1 = INFO, 2 = WARNING, 3 = ERROR
+#   Setting to '3' hides INFO and WARNING, keeping only ERROR messages.
+# - TF_ENABLE_ONEDNN_OPTS=0 disables oneDNN custom-op informational messages.
+os.environ.setdefault('TF_CPP_MIN_LOG_LEVEL', '3')
+os.environ.setdefault('TF_ENABLE_ONEDNN_OPTS', '0')
+
 import mcrpy
 import numpy as np
 from mcrpy.view import view
@@ -9,7 +17,11 @@ from mcrpy.src.Microstructure import Microstructure
 from mcrpy.src.Settings import CharacterizationSettings, ReconstructionSettings
 import datetime
 import pickle
-import os
+
+# Suppress warnings
+warnings.filterwarnings("ignore")
+# Also set Python-side logger to ERROR for tensorflow logger (if TF is imported later)
+logging.getLogger('tensorflow').setLevel(logging.ERROR)
 
 ''' This code is for the purpose of performing a microstructure reconstruction 
 using differiable and non-differentiable descriptors. For performance reasons, 
@@ -296,39 +308,20 @@ diff_2D_optimizer = MultiStepOptimizer(full_3d=False,
                                       info='2D_'+ datetime_string,
                                       descriptor_list=desired_descriptor_list,
                                       goal_ms_shape=(20,20,20),
-                                      max_iter=1,
-                                      population_size=1000,
+                                      max_iter=200,
+                                      #population_size=1000,
                                       verbose=True)
 
-# diff_2D_optimizer.view_goal_ms()
+diff_2D_optimizer.view_goal_ms()
 diff_2D_optimizer.characterize(verbose=True)
 diff_2D_optimizer.reconstruct()
 diff_2D_optimizer.view_convergence_data()
 
-# diff_2D_optimizer.view_result_ms()
-# diff_2D_optimizer.to_pickle()
+diff_2D_optimizer.view_result_ms()
+diff_2D_optimizer.to_pickle()
 result_ms = diff_2D_optimizer.result_ms
 
-# diff_2D_optimizer2 = MultiStepOptimizer(full_3d=False,
-#                                       goal_ms=goal_ms_path,
-#                                       is_differentiable=True,
-#                                       use_multigrid=False,
-#                                       use_multiphase=True,
-#                                       info='2D_2_'+ datetime_string,
-#                                       descriptor_list=desired_descriptor_list,
-#                                       #goal_ms_shape=(20,20,20),
-#                                       max_iter=20,
-#                                       initial_ms=result_ms,
-#                                       population_size=10,
-#                                       verbose=True)
-
-# diff_2D_optimizer2.characterize(verbose=True)
-# diff_2D_optimizer2.reconstruct()
-# diff_2D_optimizer2.view_convergence_data()
-# # diff_2D_optimizer2.view_result_ms()
-# # diff_2D_optimizer2.to_pickle()
-# result_ms = diff_2D_optimizer2.result_ms
-
+############
 
 diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       goal_ms=goal_ms_path,
@@ -337,19 +330,20 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       use_multiphase=True,
                                       info='3D' + datetime_string,
                                       descriptor_list=desired_descriptor_list,
-                                      optimizer="GeneticAlgorithm",
-                                      max_iter=20,
-                                      population_size=20,
-                                      #initial_ms=result_ms,
-                                      goal_ms_shape=(20,20,20),
+                                      #optimizer="GeneticAlgorithm",
+                                      optimizer="SimulatedAnnealing",
+                                      max_iter=2000,
+                                      population_size=150,
+                                      initial_ms=result_ms,
                                       verbose=True)
 
+# diff_3D_optimizer.view_initial_ms()
 diff_3D_optimizer.characterize(verbose=True)
 diff_3D_optimizer.reconstruct()
 diff_3D_optimizer.view_convergence_data()
-# diff_3D_opimizer.view_result_ms()
-# diff_3D_optimizer.view_initial_ms()
+diff_3D_optimizer.view_result_ms()
 diff_3D_optimizer.to_pickle()
+
 
 # diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
 #                                       goal_ms=goal_ms_path,
