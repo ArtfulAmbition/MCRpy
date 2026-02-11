@@ -140,3 +140,6 @@ results
 *.dot
 classesUML.png
 packages.png
+
+# result pictures
+*.vtr
