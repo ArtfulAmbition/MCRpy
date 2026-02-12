@@ -50,7 +50,6 @@ class Loss(ABC):
                   descriptor_is_multiphase: List[bool] = None,
                   use_orientations: bool = False,
                   **kwargs) -> callable:
-
         if descriptor_list is None:
             raise ValueError('A descriptor_list must be passed that is not None.')
         if desired_descriptor_list is None:

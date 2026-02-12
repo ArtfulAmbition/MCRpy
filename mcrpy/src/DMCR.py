@@ -295,7 +295,7 @@ class DMCR:
 
 
         if (n_iter % self.convergence_data_steps == 0 or force_save) and not n_iter > self.max_iter:
-            tf.print('Iteration', n_iter, 'of', self.max_iter, ':', loss, output_stream=sys.stdout)
+            tf.print('Iteration', n_iter, 'of', self.max_iter, ':', loss,'\r', output_stream=sys.stdout)
             self.convergence_data['scatter_data'].append((n_iter, loss))
             # self.convergence_data['raw_data'].append([self.resample_microstructure(ms, zoom=self.pool_size)])
             self.convergence_data['raw_data'].append(copy.deepcopy(ms))

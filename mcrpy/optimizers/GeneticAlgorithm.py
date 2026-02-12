@@ -10,6 +10,7 @@ import numpy as np
 from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
+from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.core.mutation import Mutation
@@ -248,7 +249,8 @@ class GeneticAlgorithm(Optimizer):
         xu = np.full(n_elements, self.n_phases - 1) # upper bound for variables in function to be evaluated
 
         class OptimizationProblem(Problem):          
-            def __init__(self,call_loss, 
+            def __init__(self,
+                         call_loss, 
                          use_multiphase
                          ):
                 self.call_loss = call_loss
