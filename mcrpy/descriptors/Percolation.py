@@ -82,7 +82,7 @@ def get_labeled_ms(ms_phase_of_interest: NDArray[np.bool_], connectivity='sides'
 
             return labeled_ms, n_labels
 
-def get_number_of_isolated_and_unknown_voxels(labeled_ms):
+def get_number_of_isolated_and_unknown_voxels(labeled_ms, labels_at_both_surface_and_target, n_labels):
     dimensionality = len(labeled_ms.shape)
 ## Check for cluster labels which are present on all sides:
     #Accessing outer borders
@@ -147,22 +147,22 @@ class Percolation(PhaseDescriptor3D):
             # This is the case, if there are the same cluster labels in labeled_ms at both relevant sides
 
             # find a boolean microstructre for clusters which are connected with the relevant sides of the specified direction 
-            ms_connected_phase_of_interest, _ = get_connected_phases_of_interest(labeled_ms, direction)
+            ms_connected_phase_of_interest, labels_at_both_surface_and_target = get_connected_phases_of_interest(labeled_ms, direction)
 
             n_connected_voxels:int = np.count_nonzero(ms_connected_phase_of_interest)
             n_cluster = n_labels
 
             #count the number of voxels in each cluster:
             labels_with_label_zero, counts_with_label_zero = np.unique(labeled_ms, return_counts=True)
-            labels = labels_with_label_zero[labels_with_label_zero!=0]
+            # labels = labels_with_label_zero[labels_with_label_zero!=0]
             counts = counts_with_label_zero[labels_with_label_zero!=0]
             idx_largest_cluster = np.argmax(counts)
             #largest_cluster_label = labels[idx_largest_cluster]
             number_of_voxels_in_largest_cluster = counts[idx_largest_cluster]
 
-            n_isolated_voxels, n_unknown_voxels = get_number_of_isolated_and_unknown_voxels(labeled_ms)
+            n_isolated_voxels, n_unknown_voxels = get_number_of_isolated_and_unknown_voxels(labeled_ms, labels_at_both_surface_and_target, n_labels)
            
-            calculate_max_distance_in_direction(labeled_ms=labeled_ms, direction=direction, n_labels=n_labels)
+            distance_from_side_of_connected_path = calculate_max_distance_in_direction(labeled_ms=labeled_ms, direction=direction, n_labels=n_labels)
 
             # Find and count the voxels of phases which are not of interest
             n_voxels_not_of_interest = np.count_nonzero(labeled_ms==0)
@@ -173,7 +173,7 @@ class Percolation(PhaseDescriptor3D):
             fraction_isolated_voxels = n_isolated_voxels / total_number_voxels
             fraction_unknown_voxels = n_unknown_voxels / total_number_voxels
             fraction_voxels_without_phase_of_interest = n_voxels_not_of_interest / total_number_voxels
-
+            fraction_largest_cluster = number_of_voxels_in_largest_cluster / total_number_voxels
 
             #print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
 
@@ -186,7 +186,7 @@ class Percolation(PhaseDescriptor3D):
 
             return fraction_connected_voxels, is_percolating, percolation_info_dict
             
-        def calculate_max_distance_in_direction(labeled_ms, direction:int, n_labels:int=None, ):
+        def calculate_max_distance_in_direction(labeled_ms, direction:int, n_labels:int=None):
             # returns the length in the specified direction of a connected path starting from the respective side 
             
             if not n_labels:
@@ -212,17 +212,31 @@ class Percolation(PhaseDescriptor3D):
 
             # Extract the source and target node labels using the dynamically created slices
             source_node_labels = np.unique(labeled_ms[tuple(slices_source)])
-            target_node_labels = np.unique(labeled_ms[tuple(slices_target)])
-            
-            for slice_no in range(labeled_ms.shape[direction]+1):
-                 slices_target[direction] = -slice_no
-                 print(-slice_no)
             
             
+            # Exclude the zero from source- and target_node_labels, since zero represents phases which are not of interest
+            source_node_labels = source_node_labels[source_node_labels != 0]
             
-            pass
+            
+            #Check which labels are present at the source and the target surface / edge
+            
+            # print(labeled_ms)
+            length_ms = labeled_ms.shape[direction]
+            for ii in range(length_ms):
+                 slice_no = -(ii+1)
+                 slices_target[direction] = slice_no
+                #  print(f'slice: {slice_no}')
+                 target_node_labels = np.unique(labeled_ms[tuple(slices_target)])
+                 target_node_labels = target_node_labels[target_node_labels != 0]
+                 labels_at_both_surface_and_target = np.intersect1d(source_node_labels, target_node_labels)
+                #  print(f'common labels: {labels_at_both_surface_and_target}')
+                 if len(labels_at_both_surface_and_target)>0:
+                      lx = length_ms - ii
+                      break
+                 else: 
+                      lx = 0
 
-
+            return lx/length_ms
 
         def calculate_percolation_multidirection(ms_phase_of_interest: NDArray[np.bool_], directions:list):
              
