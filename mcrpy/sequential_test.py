@@ -341,7 +341,7 @@ goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3
 # diff_2D_optimizer.to_pickle()
 # result_ms = diff_2D_optimizer.result_ms
 
-myoptimizer = MultiStepOptimizer.from_pickle('/home/sobczyk/Dokumente/MCRpy/results/MultiStepOptimizer_2D_2026-02-11_14:48:27.pkl')
+myoptimizer = MultiStepOptimizer.from_pickle('/home/sobczyk/Dokumente/MCRpy/results/MultiStepOptimizer_2D_2026-02-11_14:48:27.pkl') #bereits recht gut optimierte ms mittels diff
 result_ms = myoptimizer.result_ms
 
 
@@ -357,7 +357,7 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       descriptor_weights=descriptor_weights,
                                       optimizer="GeneticAlgorithm",
                                       #optimizer="SimulatedAnnealing",
-                                      max_iter=100,
+                                      max_iter=10,
                                       population_size=5,
                                       initial_ms=result_ms,
                                       verbose=True)

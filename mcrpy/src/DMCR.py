@@ -281,17 +281,7 @@ class DMCR:
         """Function to call every iteration for monitoring convergence and storing results. Technically not a callback function."""
         self.convergence_data['line_data'].append((n_iter, loss))
                     
-        import mcrpy
-        from mcrpy.src.Settings import CharacterizationSettings
-        char_settings = CharacterizationSettings(
-            descriptor_types=self.descriptor_types,
-            full_3d=self.full_3d,
-            use_multigrid_descriptor=self.use_multigrid_descriptor,
-            use_multiphase=self.use_multiphase,
-            target_folder=self.save_to,
-            logging_level=logging.INFO,
-            limit_to=self.limit_to,
-        )
+
 
 
         if (n_iter % self.convergence_data_steps == 0 or force_save) and not n_iter > self.max_iter:
@@ -299,8 +289,28 @@ class DMCR:
             self.convergence_data['scatter_data'].append((n_iter, loss))
             # self.convergence_data['raw_data'].append([self.resample_microstructure(ms, zoom=self.pool_size)])
             self.convergence_data['raw_data'].append(copy.deepcopy(ms))
+            
+            print_descriptor_vals = True # comes with a huge cost!
+            if print_descriptor_vals:
+                import mcrpy
+                from mcrpy.src.Settings import CharacterizationSettings
+                char_settings = CharacterizationSettings(
+                    descriptor_types=self.descriptor_types,
+                    full_3d=self.full_3d,
+                    use_multigrid_descriptor=self.use_multigrid_descriptor,
+                    use_multiphase=self.use_multiphase,
+                    target_folder=self.save_to,
+                    logging_level=logging.INFO,
+                    limit_to=self.limit_to,
+                    )
+                characterization = mcrpy.characterize(ms, char_settings)
+                descriptor_list= [descriptor_str for descriptor_str in characterization.keys() if descriptor_str not in ['settings','FFTCorrelations3D']]
+                for descriptor in descriptor_list:
+                    print(f'{descriptor}: {list(np.reshape(characterization[descriptor],characterization[descriptor].size))}')
+                print('\n' + '-'*10)
 
-            characterization = mcrpy.characterize(ms, char_settings)
+
+                
 
         if n_iter % self.outfile_data_steps == 0 and (
                 n_iter > 0 or self.outfile_data_steps < np.inf):

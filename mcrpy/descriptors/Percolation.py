@@ -202,6 +202,7 @@ class Percolation(PhaseDescriptor3D):
                 assert all(isinstance(item, int) for item in phase_of_interest), "type error: phase_of_interest must be an integer or a list of integers"
                 phase_of_interest_list = phase_of_interest
 
+           #create boolean array, True representing phase of interest
             ms_phase_of_interest = np.isin(ms, phase_of_interest_list)
             
             dimensionality = len(ms.shape)      
@@ -215,7 +216,7 @@ class Percolation(PhaseDescriptor3D):
 
             fraction_connected_voxels, is_percolating, percolation_info_dict = calculate_percolation_multidirection(ms_phase_of_interest,directions=directions)
 
-            return tf.cast(tf.constant(fraction_connected_voxels), tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
+            return tf.cast(fraction_connected_voxels, tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
         return model
 
     @staticmethod
@@ -303,6 +304,7 @@ if __name__=="__main__":
 
 ##------------------------------------------------------------------
    
+    ms[1][0]=0
     percolation_descriptor = Percolation()
     singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor()
 
