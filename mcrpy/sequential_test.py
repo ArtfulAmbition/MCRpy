@@ -355,14 +355,14 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       info='3D' + datetime_string,
                                       descriptor_list=desired_descriptor_list,
                                       descriptor_weights=descriptor_weights,
-                                      optimizer="GeneticAlgorithm",
-                                      #optimizer="SimulatedAnnealing",
+                                      #optimizer="GeneticAlgorithm",
+                                      optimizer="SimulatedAnnealing",
                                       max_iter=10,
                                       population_size=5,
                                       initial_ms=result_ms,
                                       verbose=True)
 
-# diff_3D_optimizer.view_initial_ms()
+diff_3D_optimizer.view_initial_ms()
 diff_3D_optimizer.characterize(verbose=True)
 diff_3D_optimizer.reconstruct()
 diff_3D_optimizer.view_convergence_data()
