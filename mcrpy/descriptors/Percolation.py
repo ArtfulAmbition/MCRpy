@@ -33,7 +33,6 @@ from scipy.ndimage import label
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
 from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
 
-
 def get_connected_phases_of_interest(labeled_ms: np.ndarray[int], direction:int=0) -> np.ndarray[bool]:
             
             dimensionality = len(labeled_ms.shape)
@@ -83,6 +82,45 @@ def get_labeled_ms(ms_phase_of_interest: NDArray[np.bool_], connectivity='sides'
 
             return labeled_ms, n_labels
 
+def get_number_of_isolated_and_unknown_voxels(labeled_ms):
+    dimensionality = len(labeled_ms.shape)
+## Check for cluster labels which are present on all sides:
+    #Accessing outer borders
+    if dimensionality == 2:
+        labels_at_borders = np.unique(
+            np.concatenate((
+            labeled_ms[0,:].flatten(),
+            labeled_ms[-1,:].flatten(),
+            labeled_ms[:,0].flatten(),
+            labeled_ms[:,-1].flatten(),
+        )))
+    else: # dimensionality == 3
+        labels_at_borders = np.unique(
+            np.concatenate((
+            labeled_ms[0, :, :].flatten(),       
+            labeled_ms[-1, :, :].flatten(),     
+            labeled_ms[:, 0, :].flatten(),       
+            labeled_ms[:, -1, :].flatten(),      
+            labeled_ms[:, :, 0].flatten(),       
+            labeled_ms[:, :, -1].flatten()       
+        )))
+
+    # Extract labels, which are only present on the sides,
+    # and not at the sides belonging to the specified direction
+    # then, count the respective voxels
+    labels_only_at_other_surfaces = list(set(labels_at_borders) - set(labels_at_both_surface_and_target))
+    labels_only_at_other_surfaces = [label for label in labels_only_at_other_surfaces if label != 0]  # Exclude the zero (zero represents phases which are not of interest)
+    n_unknown_voxels = np.count_nonzero(np.isin(labeled_ms, labels_only_at_other_surfaces))
+
+    # Find the voxels, which are not connected to the borders (isolated clusters):
+    isolated_labels = [label for label in range(n_labels) if label not in labels_at_borders]
+    #Count the number of respective voxels
+    boolean_mask_isolated = np.isin(labeled_ms, isolated_labels)
+    n_isolated_voxels = np.count_nonzero(boolean_mask_isolated)
+
+    return n_isolated_voxels, n_unknown_voxels
+
+
 class Percolation(PhaseDescriptor3D):
     is_differentiable = False
     tf.experimental.numpy.experimental_enable_numpy_behavior()
@@ -97,7 +135,7 @@ class Percolation(PhaseDescriptor3D):
         phase_of_interest : Union[int,list[int]] = 1, #for which phase number(s) the tortuosity shall be calculated
         **kwargs) -> callable:
 
-        def calculate_percolation_single_direction(ms_phase_of_interest: NDArray[np.bool_], direction):
+        def calculate_percolation_single_direction(ms_phase_of_interest: NDArray[np.bool_], direction:int):
 
             dimensionality = len(ms_phase_of_interest.shape)
             assert dimensionality in [2,3] # only 2 and 3D microstructures
@@ -109,43 +147,22 @@ class Percolation(PhaseDescriptor3D):
             # This is the case, if there are the same cluster labels in labeled_ms at both relevant sides
 
             # find a boolean microstructre for clusters which are connected with the relevant sides of the specified direction 
-            ms_connected_phase_of_interest, labels_at_both_surface_and_target = get_connected_phases_of_interest(labeled_ms, direction)
+            ms_connected_phase_of_interest, _ = get_connected_phases_of_interest(labeled_ms, direction)
 
             n_connected_voxels:int = np.count_nonzero(ms_connected_phase_of_interest)
+            n_cluster = n_labels
 
-            ## Check for cluster labels which are present on all sides:
-            #Accessing outer borders
-            if dimensionality == 2:
-                labels_at_borders = np.unique(
-                    np.concatenate((
-                    labeled_ms[0,:].flatten(),
-                    labeled_ms[-1,:].flatten(),
-                    labeled_ms[:,0].flatten(),
-                    labeled_ms[:,-1].flatten(),
-                )))
-            else: # dimensionality == 3
-                labels_at_borders = np.unique(
-                    np.concatenate((
-                    labeled_ms[0, :, :].flatten(),       
-                    labeled_ms[-1, :, :].flatten(),     
-                    labeled_ms[:, 0, :].flatten(),       
-                    labeled_ms[:, -1, :].flatten(),      
-                    labeled_ms[:, :, 0].flatten(),       
-                    labeled_ms[:, :, -1].flatten()       
-                )))
+            #count the number of voxels in each cluster:
+            labels_with_label_zero, counts_with_label_zero = np.unique(labeled_ms, return_counts=True)
+            labels = labels_with_label_zero[labels_with_label_zero!=0]
+            counts = counts_with_label_zero[labels_with_label_zero!=0]
+            idx_largest_cluster = np.argmax(counts)
+            #largest_cluster_label = labels[idx_largest_cluster]
+            number_of_voxels_in_largest_cluster = counts[idx_largest_cluster]
 
-            # Extract labels, which are only present on the sides,
-            # and not at the sides belonging to the specified direction
-            # then, count the respective voxels
-            labels_only_at_other_surfaces = list(set(labels_at_borders) - set(labels_at_both_surface_and_target))
-            labels_only_at_other_surfaces = [label for label in labels_only_at_other_surfaces if label != 0]  # Exclude the zero (zero represents phases which are not of interest)
-            n_unknown_voxels = np.count_nonzero(np.isin(labeled_ms, labels_only_at_other_surfaces))
-
-            # Find the voxels, which are not connected to the borders (isolated clusters):
-            isolated_labels = [label for label in range(n_labels) if label not in labels_at_borders]
-            #Count the number of respective voxels
-            boolean_mask_isolated = np.isin(labeled_ms, isolated_labels)
-            n_isolated_voxels = np.count_nonzero(boolean_mask_isolated)
+            n_isolated_voxels, n_unknown_voxels = get_number_of_isolated_and_unknown_voxels(labeled_ms)
+           
+            calculate_max_distance_in_direction(labeled_ms=labeled_ms, direction=direction, n_labels=n_labels)
 
             # Find and count the voxels of phases which are not of interest
             n_voxels_not_of_interest = np.count_nonzero(labeled_ms==0)
@@ -156,6 +173,7 @@ class Percolation(PhaseDescriptor3D):
             fraction_isolated_voxels = n_isolated_voxels / total_number_voxels
             fraction_unknown_voxels = n_unknown_voxels / total_number_voxels
             fraction_voxels_without_phase_of_interest = n_voxels_not_of_interest / total_number_voxels
+
 
             #print(f'{fraction_connected_voxels}, {fraction_isolated_voxels}, {fraction_unknown_voxels}, {fraction_voxels_without_phase_of_interest}')
 
@@ -168,6 +186,44 @@ class Percolation(PhaseDescriptor3D):
 
             return fraction_connected_voxels, is_percolating, percolation_info_dict
             
+        def calculate_max_distance_in_direction(labeled_ms, direction:int, n_labels:int=None, ):
+            # returns the length in the specified direction of a connected path starting from the respective side 
+            
+            if not n_labels:
+                 n_labels=max(np.unique(labeled_ms))
+                 if n_labels==0:
+                      raise ValueError('no labels found')
+            
+            dimensionality = len(labeled_ms.shape)
+            assert dimensionality in [2,3] # only 2 and 3D microstructures
+            if dimensionality == 2:
+                if direction not in (0, 1):
+                    raise ValueError("direction must be 0 or 1 for 2D microstructures")
+            else:  # dimensionality == 3
+                if direction not in (0, 1, 2):
+                    raise ValueError("direction must be 0, 1 or 2 for 3D microstructures")
+
+
+            # Generate the appropriate slices based on dimensionality and direction
+            slices_source = [slice(None)] * dimensionality  # Initialize a list of slices
+            slices_target = [slice(None)] * dimensionality  # Initialize a list of slices
+            slices_source[direction] =  0        # First layer
+            slices_target[direction] = -1        # Last layer
+
+            # Extract the source and target node labels using the dynamically created slices
+            source_node_labels = np.unique(labeled_ms[tuple(slices_source)])
+            target_node_labels = np.unique(labeled_ms[tuple(slices_target)])
+            
+            for slice_no in range(labeled_ms.shape[direction]+1):
+                 slices_target[direction] = -slice_no
+                 print(-slice_no)
+            
+            
+            
+            pass
+
+
+
         def calculate_percolation_multidirection(ms_phase_of_interest: NDArray[np.bool_], directions:list):
              
             fraction_connected_voxels = [] 
@@ -263,7 +319,8 @@ if __name__=="__main__":
 
     ms = np.zeros((5, 5))
     ms[1,:] = 1
-
+    ms[-1,:] = 1
+    ms[1][0]=0
     #ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
 
 
@@ -304,7 +361,7 @@ if __name__=="__main__":
 
 ##------------------------------------------------------------------
    
-    ms[1][0]=0
+    
     percolation_descriptor = Percolation()
     singlephase_descriptor = percolation_descriptor.make_singlephase_descriptor()
 
