@@ -33,6 +33,8 @@ from scipy.ndimage import label
 from mcrpy.descriptors.descriptor_utils.descriptor_utils import get_connectivity_directions
 from mcrpy.descriptors.PhaseDescriptor3D import PhaseDescriptor3D
 
+tf.config.run_functions_eagerly(True)
+
 def get_connected_phases_of_interest(labeled_ms: np.ndarray[int], direction:int=0) -> np.ndarray[bool]:
             
             dimensionality = len(labeled_ms.shape)
@@ -293,13 +295,12 @@ class Percolation(PhaseDescriptor3D):
            
 
             percolation_list = calculate_percolation_multidirection(ms_phase_of_interest,directions=directions)
-
-            return tf.cast(percolation_list, tf.float64)#, tf.cast(tf.constant(mean_tortuosity), tf.float64)
+            
+            # For non-differentiable descriptors the function should return a numpy.ndarray
+            # (dtype float64). The framework will convert this to a tf.Tensor for you.
+            # Return a 1-D array with all percolation values collected above.
+            return np.asarray(percolation_list, dtype=np.float64)
         return model
-
-    @staticmethod
-    def make_multiphase_descriptor():
-        return 0
 
 def register() -> None:
     descriptor_factory.register("Percolation", Percolation)

@@ -26,6 +26,8 @@ from mcrpy.descriptors.MultiPhaseDescriptor3D import MultiPhaseDescriptor3D
 from mcrpy.descriptors.SPB import compute_phase_boundaries_3d
 from mcrpy.descriptors.Descriptor import make_image_padder_3d
 
+tf.config.run_functions_eagerly(True)
+
 
 class TPB3D(MultiPhaseDescriptor3D):
     is_differentiable = True
