@@ -21,7 +21,7 @@ from mcrpy.optimizers.Optimizer import Optimizer
 from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 import logging
 import warnings
-
+import tensorflow as tf
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -54,10 +54,14 @@ class DiverseRandomSampling(Sampling):
                  ):
         super().__init__()
         self.initial_ms=initial_ms
+
     """Custom sampling to ensure phase diversity in initial population.
     
     Optionally creates an initial connected path for the phase_of_interest
     to provide a better starting point for tortuosity optimization.
+
+    if initial ms is provided, a random sampling will be performed in combination to the 
+    initial ms.
     """
     
     def _do(self, problem, n_samples, **kwargs):
@@ -113,11 +117,15 @@ class DiverseRandomSampling(Sampling):
 
             if self.initial_ms:
                 individuum_init = decode_MS_as_individuum(self.initial_ms)
-                print('start creating population')
-                population = create_population_as_random_variation_of_one_individuum(individuum_init)
-                print('finished creating population')
-            else:
                 population = make_random_population()
+                population[0] = individuum_init
+                print('start creating population from initial ms')
+                #population = create_population_as_random_variation_of_one_individuum(individuum_init)
+               
+            else:
+                print('start creating random population')
+                population = make_random_population()
+            print('finished creating population')
 
             X = population
             return X
@@ -212,7 +220,7 @@ class GeneticAlgorithm(Optimizer):
                  n_phases: int = None, # zero and one
                  tolerance: float = 0.00001,
                  use_multiphase: bool = False, 
-                 mutation_rule: str = 'phasebitflip', # phasebitflip or PM
+                 mutation_rule: str = 'PM', # phasebitflip or PM
                  use_orientations: bool = False,
                  is_3D: bool = False,
                  **kwargs):
@@ -281,12 +289,12 @@ class GeneticAlgorithm(Optimizer):
             )
 
         self.sampling=DiverseRandomSampling(initial_ms=self.ms)
-        self.crossover = SBX(prob=0.9, eta=15,vtype=float, repair=RoundingRepair())
+        self.crossover = SBX(prob=0.6, eta=0.1,vtype=float, repair=RoundingRepair())
         # by default use polynomial mutation PM; allow switching to PhaseBitflip via mutation_rule
         if str(self.mutation_rule).lower() in {'phasebitflip', 'phase_bitflip', 'bitflip'}:
-            self.mutation = PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=self.n_phases)
+            self.mutation = PhaseBitflip(prob=0.1, prob_var=0.1, n_phases=self.n_phases)
         else:
-            self.mutation = PM(prob=0.5, eta=1, vtype=float, repair=RoundingRepair())
+            self.mutation = PM(prob=0.3, eta=10, vtype=float, repair=RoundingRepair())
 
         self.algorithm = GA(
                 pop_size=self.population_size,
@@ -328,6 +336,18 @@ class GeneticAlgorithm(Optimizer):
         self.algorithm.next() # evaluate the next generation
         result = self.algorithm.result() # getting the results for the evaluated generation
         new_loss = float(result.F)
+        
+        def vol_frac(individual):
+            vol_frac = []
+            for phase_num in range(3):
+                # population = [individual.X for individual in res.pop]
+                count = sum(x==phase_num for x in individual)
+                n_voxel = len(individual)
+                vol_frac.append(count/n_voxel)
+            return vol_frac
+        #print(f'new vol_frac: {vol_frac(result.X)}')
+        other_losses = np.unique([individual.F for individual in result.pop])
+        print(f'alternative losses: {other_losses}')
         X = result.X.copy()
         #current_best_ms = X[best_idx].copy()
         current_best_ms_arr = X.reshape(self.ms.spatial_shape)

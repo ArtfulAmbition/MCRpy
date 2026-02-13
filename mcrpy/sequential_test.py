@@ -56,7 +56,9 @@ class MultiStepOptimizer:
                  initial_ms:Union[str,Microstructure] = None, # path or Microstructure of the ms used as starting point for optimization
                  info:str='',
                  **kwargs):
+        self.descriptor_list = descriptor_list
         self.descriptor_weights = descriptor_weights
+        assert len(self.descriptor_list)==len(self.descriptor_weights)
         self.n_phases = n_phases
         self.tolerance = tolerance
         self.population_size = population_size
@@ -72,7 +74,8 @@ class MultiStepOptimizer:
         self.use_multiphase = use_multiphase
         self.characterization_goal=characterization_goal
         assert isinstance(descriptor_list,list)
-        self.descriptor_list = descriptor_list
+        
+        
         self.map_descriptor_list()
         
         if optimizer:
@@ -227,7 +230,10 @@ class MultiStepOptimizer:
             }
         
         dim_mapped_descriptor_list = []
-        for descriptor_string in self.descriptor_list:
+        dim_mapped_descriptor_weight_list = []
+        descriptor_list = self.descriptor_list.copy()
+        descriptor_weights = self.descriptor_weights.copy()
+        for descriptor_string in descriptor_list:
             try:
                 mapped_descriptor = descriptor_mapping[descriptor_string][dim_key]
             except:
@@ -238,7 +244,13 @@ class MultiStepOptimizer:
                     raise KeyError("The descriptor {descriptor} is not in descriptor_mapping.")
             if mapped_descriptor:
                 dim_mapped_descriptor_list.append(mapped_descriptor)
+                dim_mapped_descriptor_weight_list.append(descriptor_weights.pop(0))
+            else:
+                descriptor_weights.pop(0)
+                
         self.descriptor_list = dim_mapped_descriptor_list
+        self.descriptor_weights = dim_mapped_descriptor_weight_list
+        assert len(self.descriptor_list)==len(self.descriptor_weights)
         
         if self.is_differentiable:
             loader.load_plugins([f'mcrpy.descriptors.{descriptor}' for descriptor in self.descriptor_list])
@@ -250,17 +262,9 @@ class MultiStepOptimizer:
         if self.verbose:
             print("="*60)
             print(f'setting descriptor list to: {self.descriptor_list}.')
+            print(f'setting descriptor weight list to: {self.descriptor_weights}.')
             print("="*60)
     
-            
-
-        ##### Define the list of desired descriptors and define neccesary parameters:
-        desired_descriptor_list = ['Tortuosity3D',
-                            'VolumeFractions3D',
-                            'TPB3D',
-                            'DPB3D',
-                            'Percolation',
-                            'FFTCorrelations3D']
     
     def to_pickle(self, filename:str=None, folder=None, full_path=None, add_date=False):
         """Pickle the class instance to a file."""
@@ -295,30 +299,21 @@ class MultiStepOptimizer:
             return pickle.load(f)
 
 ##### Define the list of desired descriptors and define neccesary parameters:
-descriptor_dict = {'Tortuosity3D':1234,
-                   'VolumeFractions3D':23,
-                    'TPB3D':123,
-                    'DPB3D':4567,
-                    'Percolation':6789,
-                    'FFTCorrelations3D':12345
+descriptor_dict = {#'Tortuosity3D':1,
+                    'VolumeFractions3D':1,
+                #     'TPB3D':1,
+                #     'DPB3D':1,
+                     'Percolation':1,
+                #     'FFTCorrelations3D':1
                    }
 
 desired_descriptor_list = list(descriptor_dict.keys())
 descriptor_weights = list(descriptor_dict.values())
 
 
-# desired_descriptor_list = [
-#                     'Tortuosity3D',
-#                     'VolumeFractions3D',
-#                     'TPB3D',
-#                     'DPB3D',
-#                     'Percolation',
-#                     #'FFTCorrelations3D'
-#                     ]
-
-
 datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
-goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy"
+# goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy"
+goal_ms_path = '/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy'
 
 # diff_2D_optimizer = MultiStepOptimizer(full_3d=False,
 #                                       goal_ms=goal_ms_path,
@@ -327,6 +322,7 @@ goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3
 #                                       use_multiphase=True,
 #                                       info='2D_'+ datetime_string,
 #                                       descriptor_list=desired_descriptor_list,
+#                                       descriptor_weights=descriptor_weights,
 #                                       goal_ms_shape=(20,20,20),
 #                                       max_iter=200,
 #                                       #population_size=1000,
@@ -341,8 +337,9 @@ goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3
 # diff_2D_optimizer.to_pickle()
 # result_ms = diff_2D_optimizer.result_ms
 
-myoptimizer = MultiStepOptimizer.from_pickle('/home/sobczyk/Dokumente/MCRpy/results/MultiStepOptimizer_2D_2026-02-11_14:48:27.pkl') #bereits recht gut optimierte ms mittels diff
-result_ms = myoptimizer.result_ms
+# myoptimizer = MultiStepOptimizer.from_pickle('/home/sobczyk/Dokumente/MCRpy/results/MultiStepOptimizer_3D2026-02-13_11:29:00.pkl') #bereits recht gut optimierte ms mittels diff
+# myoptimizer.view_convergence_data()
+# result_ms = myoptimizer.result_ms
 
 
 ###########
@@ -357,11 +354,13 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       descriptor_weights=descriptor_weights,
                                       optimizer="GeneticAlgorithm",
                                       #optimizer="SimulatedAnnealing",
-                                      max_iter=2,
-                                      population_size=5,
-                                      initial_ms=result_ms,
+                                      max_iter=100,
+                                      population_size=20,
+                                      goal_ms_shape=(4,4,4),
+                                    #   initial_ms=result_ms,
                                       verbose=True)
 
+diff_3D_optimizer.view_goal_ms()
 # diff_3D_optimizer.view_initial_ms()
 diff_3D_optimizer.characterize(verbose=True)
 diff_3D_optimizer.reconstruct()

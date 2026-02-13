@@ -300,6 +300,7 @@ class Percolation(PhaseDescriptor3D):
             # (dtype float64). The framework will convert this to a tf.Tensor for you.
             # Return a 1-D array with all percolation values collected above.
             return np.asarray(percolation_list, dtype=np.float64)
+            #return np.asarray(1.5, dtype=np.float64)
         return model
 
 def register() -> None:

@@ -290,7 +290,7 @@ class DMCR:
             # self.convergence_data['raw_data'].append([self.resample_microstructure(ms, zoom=self.pool_size)])
             self.convergence_data['raw_data'].append(copy.deepcopy(ms))
             
-            print_descriptor_vals = True # comes with a huge cost!
+            print_descriptor_vals = False # comes with a huge cost!
             if print_descriptor_vals:
                 import mcrpy
                 from mcrpy.src.Settings import CharacterizationSettings
