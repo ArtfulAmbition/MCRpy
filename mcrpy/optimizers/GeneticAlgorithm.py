@@ -247,7 +247,7 @@ class GeneticAlgorithm(Optimizer):
         if use_orientations:
             raise ValueError('This optimizer_type cannot solve for orientations.')
         self.max_iter = max_iter
-        self.memory = []
+        self.cache = {} #dict to save hashes of already evaluated individuals with the respective loss
         self.conv_iter = conv_iter #number of allowed iterations without improvement
         self.is_3D = is_3D
         self.population_size = population_size
@@ -340,6 +340,9 @@ class GeneticAlgorithm(Optimizer):
         self.n_iter = 0 if restart_from_niter is None else restart_from_niter
         self.iters_since_last_accept = 0
         self.ms = ms
+
+        key = np.packbits(arr).tobytes() 
+
         self.current_loss = self.call_loss(self.ms)
 
         self.set_up_pymoo() #setting up the genetic algorithm using pymoo library
@@ -407,9 +410,7 @@ class GeneticAlgorithm(Optimizer):
             arr = np.asarray(indivual).flatten()
             print('[' + ' '.join(map(str, arr)) + ']')
         X = result.X.copy()
-        self.memory.append(result.pop)
-        if len(self.memory)==99:
-            a=1
+
 
 
         #current_best_ms = X[best_idx].copy()
@@ -429,8 +430,8 @@ class GeneticAlgorithm(Optimizer):
         self.reconstruction_callback(self.n_iter, self.current_loss, self.ms)
         return
 
-    def _mutate(self):
-        pass
+    # def _mutate(self):
+    #     pass
 
 def register() -> None:
     from mcrpy.src import optimizer_factory

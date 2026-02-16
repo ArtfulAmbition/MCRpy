@@ -300,11 +300,11 @@ class MultiStepOptimizer:
 
 ##### Define the list of desired descriptors and define neccesary parameters:
 descriptor_dict = {'Tortuosity3D':1,
-                    'VolumeFractions3D':1,
-                #     'TPB3D':1,
-                #     'DPB3D':1,
+                    'VolumeFractions3D':10,
+                     'TPB3D':1,
+                     'DPB3D':1,
                      'Percolation':1,
-                #     'FFTCorrelations3D':1
+                     'FFTCorrelations3D':1
                    }
 
 desired_descriptor_list = list(descriptor_dict.keys())
@@ -339,9 +339,9 @@ goal_ms_path = '/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4
 # diff_2D_optimizer.to_pickle()
 # result_ms = diff_2D_optimizer.result_ms
 
-myoptimizer = MultiStepOptimizer.from_pickle('/home/sobczyk/Dokumente/MCRpy/results/MultiStepOptimizer_3D2026-02-13_11:29:00.pkl') #bereits recht gut optimierte ms mittels diff
+#myoptimizer = MultiStepOptimizer.from_pickle('/home/sobczyk/Dokumente/MCRpy/results/MultiStepOptimizer_3D2026-02-13_11:29:00.pkl') #bereits recht gut optimierte ms mittels diff
 # myoptimizer.view_convergence_data()
-result_ms = myoptimizer.result_ms
+#result_ms = myoptimizer.result_ms
 
 
 ###########
@@ -357,10 +357,10 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       optimizer="GeneticAlgorithm",
                                       mutation_rule='RandomResetMutation',
                                       #optimizer="SimulatedAnnealing",
-                                      max_iter=100,
+                                      max_iter=20,
                                       population_size=20,
                                       goal_ms_shape=(4,4,4),
-                                    #   initial_ms=result_ms,
+                                      #initial_ms=result_ms,
                                       verbose=True)
 
 # diff_3D_optimizer.view_goal_ms()
