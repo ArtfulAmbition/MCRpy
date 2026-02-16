@@ -200,7 +200,7 @@ class PhaseBitflip(Mutation):
 
 class RandomResetMutation(Mutation):
 
-    def __init__(self, prob=0.1, n_phases):
+    def __init__(self,n_phases, prob=0.1):
         super().__init__()
         self.prob = prob
         self.values = np.array(np.arange(n_phases))
@@ -240,7 +240,7 @@ class GeneticAlgorithm(Optimizer):
                  n_phases: int = None, # zero and one
                  tolerance: float = 0.00001,
                  use_multiphase: bool = False, 
-                 mutation_rule: str = 'PM', # phasebitflip or PM
+                 mutation_rule: str = 'randomresetmutation', # phasebitflip or PM
                  use_orientations: bool = False,
                  is_3D: bool = False,
                  **kwargs):
@@ -314,8 +314,12 @@ class GeneticAlgorithm(Optimizer):
         # by default use polynomial mutation PM; allow switching to PhaseBitflip via mutation_rule
         if str(self.mutation_rule).lower() in {'phasebitflip', 'phase_bitflip', 'bitflip'}:
             self.mutation = PhaseBitflip(prob=0.1, prob_var=0.1, n_phases=self.n_phases)
-        else:
+        elif str(self.mutation_rule).lower() in {'pm'}:
             self.mutation = PM(prob=0.95, eta=100,prob_var=1, vtype=float, repair=RoundingRepair())
+        elif str(self.mutation_rule).lower() in {'randomresetmutation'}:
+            self.mutation = RandomResetMutation(n_phases=self.n_phases,prob=0.1)
+        else:
+            self.mutation = RandomResetMutation(n_phases=self.n_phases,prob=0.1)
 
         self.algorithm = GA(
                 pop_size=self.population_size,
