@@ -247,7 +247,6 @@ class GeneticAlgorithm(Optimizer):
         if use_orientations:
             raise ValueError('This optimizer_type cannot solve for orientations.')
         self.max_iter = max_iter
-        self.cache = {} #dict to save hashes of already evaluated individuals with the respective loss
         self.conv_iter = conv_iter #number of allowed iterations without improvement
         self.is_3D = is_3D
         self.population_size = population_size
@@ -284,6 +283,7 @@ class GeneticAlgorithm(Optimizer):
                          ):
                 self.call_loss = call_loss
                 self.use_multiphase = use_multiphase
+                self.cache = {} #dict to save hashes of already evaluated individuals with the respective loss
                 super().__init__(n_var=n_elements, # the number of variables for optimization problem is the size of the microstructure.
                                 n_obj=1, # number of objective functions to be minimized 
                                 n_constr=0, # number of constraints
@@ -291,16 +291,27 @@ class GeneticAlgorithm(Optimizer):
                                 xl=xl,
                                 xu=xu)
 
+
+            def get_lossVal(self,arr):
+                key = np.packbits(arr.flatten()).tobytes() 
+                if key in self.cache: #if individuum was calculated before return stored result
+                    return self.cache[key] 
+                else:
+                    temp_ms = MutableMicrostructure(arr, use_multiphase=self.use_multiphase, trainable=False)
+                    loss_val = float(self.call_loss(temp_ms))
+                    self.cache[key] = loss_val
+                return loss_val
+
             def _evaluate(self, X, out, *args, **kwargs):
                 fitness = []
                 for individuum in X:
                     arr = individuum.astype(int).reshape(ms_shape)
                     try:
-                        temp_ms = MutableMicrostructure(arr, use_multiphase=self.use_multiphase, trainable=False)
-                        loss_val = float(self.call_loss(temp_ms))
+                        loss_val = self.get_lossVal(arr)
                     except Exception as e:
                         logging.debug(f'Error evaluating candidate: {e}')
                         loss_val = np.inf
+                        raise ValueError
                     fitness.append(loss_val)
                 out['F'] = np.array(fitness).reshape(-1,1)
 
@@ -340,9 +351,6 @@ class GeneticAlgorithm(Optimizer):
         self.n_iter = 0 if restart_from_niter is None else restart_from_niter
         self.iters_since_last_accept = 0
         self.ms = ms
-
-        key = np.packbits(arr).tobytes() 
-
         self.current_loss = self.call_loss(self.ms)
 
         self.set_up_pymoo() #setting up the genetic algorithm using pymoo library
@@ -405,10 +413,10 @@ class GeneticAlgorithm(Optimizer):
                     # write the entire array on a single line, then add a newline
                     _ga_out.write('[' + ' '.join(map(str, arr)) + ']\n')
 
-        print(f'individua:')
-        for indivual in individuals:
-            arr = np.asarray(indivual).flatten()
-            print('[' + ' '.join(map(str, arr)) + ']')
+        # print(f'individua:')
+        # for indivual in individuals:
+        #     arr = np.asarray(indivual).flatten()
+        #     print('[' + ' '.join(map(str, arr)) + ']')
         X = result.X.copy()
 
 
