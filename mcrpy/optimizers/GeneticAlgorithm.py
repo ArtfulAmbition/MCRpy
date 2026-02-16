@@ -17,6 +17,7 @@ from pymoo.core.mutation import Mutation
 from pymoo.core.sampling import Sampling
 from pymoo.core.termination import NoTermination
 from pymoo.operators.repair.rounding import RoundingRepair
+from pymoo.operators.sampling.rnd import IntegerRandomSampling
 from mcrpy.optimizers.Optimizer import Optimizer
 from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 import logging
@@ -197,6 +198,25 @@ class PhaseBitflip(Mutation):
 
         return X
 
+class RandomResetMutation(Mutation):
+
+    def __init__(self, prob=0.1, n_phases):
+        super().__init__()
+        self.prob = prob
+        self.values = np.array(np.arange(n_phases))
+
+    def _do(self, problem, X, **kwargs):
+        X = X.copy()
+
+        for i in range(X.shape[0]):          # individuals
+            for j in range(X.shape[1]):      # variables
+                if np.random.rand() < self.prob:
+                    current = X[i, j]
+                    choices = self.values[self.values != current]
+                    X[i, j] = np.random.choice(choices)
+
+        return X
+
 class GeneticAlgorithm(Optimizer):
     """MCRpy optimizer adapter wrapping pymoo-based GA runs.
 
@@ -227,6 +247,7 @@ class GeneticAlgorithm(Optimizer):
         if use_orientations:
             raise ValueError('This optimizer_type cannot solve for orientations.')
         self.max_iter = max_iter
+        self.memory = []
         self.conv_iter = conv_iter #number of allowed iterations without improvement
         self.is_3D = is_3D
         self.population_size = population_size
@@ -276,12 +297,12 @@ class GeneticAlgorithm(Optimizer):
                     arr = individuum.astype(int).reshape(ms_shape)
                     try:
                         temp_ms = MutableMicrostructure(arr, use_multiphase=self.use_multiphase, trainable=False)
-                        val = float(self.call_loss(temp_ms))
+                        loss_val = float(self.call_loss(temp_ms))
                     except Exception as e:
                         logging.debug(f'Error evaluating candidate: {e}')
-                        val = np.inf
-                    fitness.append(val)
-                    out['F'] = np.array(fitness).reshape(-1,1)
+                        loss_val = np.inf
+                    fitness.append(loss_val)
+                out['F'] = np.array(fitness).reshape(-1,1)
 
         self.problem = OptimizationProblem(          
             call_loss=self.call_loss,
@@ -294,7 +315,7 @@ class GeneticAlgorithm(Optimizer):
         if str(self.mutation_rule).lower() in {'phasebitflip', 'phase_bitflip', 'bitflip'}:
             self.mutation = PhaseBitflip(prob=0.1, prob_var=0.1, n_phases=self.n_phases)
         else:
-            self.mutation = PM(prob=0.3, eta=10, vtype=float, repair=RoundingRepair())
+            self.mutation = PM(prob=0.95, eta=100,prob_var=1, vtype=float, repair=RoundingRepair())
 
         self.algorithm = GA(
                 pop_size=self.population_size,
@@ -303,7 +324,7 @@ class GeneticAlgorithm(Optimizer):
                 # Use PhaseBitflip to ensure mutated values remain in [0, n_phases-1]
                 #mutation=PhaseBitflip(prob=0.5, prob_var=0.3, n_phases=n_phases), #seems to work well for very small examples
                 mutation=self.mutation,
-                eliminate_duplicates=True
+                eliminate_duplicates=True,
                 )
         
         # prepare the algorithm to solve the specific problem (same arguments as for the minimize function)
@@ -345,10 +366,48 @@ class GeneticAlgorithm(Optimizer):
                 n_voxel = len(individual)
                 vol_frac.append(count/n_voxel)
             return vol_frac
+        def print_characterization(descriptor_list:list=None):
+            import mcrpy
+            from mcrpy.src.Settings import CharacterizationSettings
+            char_settings = CharacterizationSettings(
+                descriptor_types=self.descriptor_types,
+                full_3d=self.full_3d,
+                use_multigrid_descriptor=self.use_multigrid_descriptor,
+                use_multiphase=self.use_multiphase,
+                target_folder=self.save_to,
+                logging_level=logging.INFO,
+                limit_to=self.limit_to,
+                )
+            characterization = mcrpy.characterize(ms, char_settings)
+            descriptor_list= [descriptor_str for descriptor_str in characterization.keys() if descriptor_str not in ['settings','FFTCorrelations3D']]
+            for descriptor in descriptor_list:
+                print(f'{descriptor}: {list(np.reshape(characterization[descriptor],characterization[descriptor].size))}')
+            print('\n' + '-'*10)
+
         #print(f'new vol_frac: {vol_frac(result.X)}')
         other_losses = np.unique([individual.F for individual in result.pop])
-        print(f'alternative losses: {other_losses}')
+        individuals = [individual.X for individual in result.pop]
+        #print(f'alternative losses: {other_losses}')
+        # also append the "individua" output to GA_output.txt (only on MPI rank 0) and keep console prints
+        if rank == 0:
+            out_path = os.path.join(os.getcwd(), "GA_output.txt")
+            with open(out_path, "a") as _ga_out:
+                _ga_out.write('individua:\n')
+                for indivual in individuals:
+                    arr = np.asarray(indivual).flatten()
+                    # write the entire array on a single line, then add a newline
+                    _ga_out.write('[' + ' '.join(map(str, arr)) + ']\n')
+
+        print(f'individua:')
+        for indivual in individuals:
+            arr = np.asarray(indivual).flatten()
+            print('[' + ' '.join(map(str, arr)) + ']')
         X = result.X.copy()
+        self.memory.append(result.pop)
+        if len(self.memory)==99:
+            a=1
+
+
         #current_best_ms = X[best_idx].copy()
         current_best_ms_arr = X.reshape(self.ms.spatial_shape)
         
@@ -358,7 +417,8 @@ class GeneticAlgorithm(Optimizer):
         if loss_amelioration > 0 :
             self.iters_since_last_accept = 0
             self.current_loss = new_loss
-            self.ms = MutableMicrostructure(current_best_ms_arr, use_multiphase=self.use_multiphase, trainable=False)
+            new_ms = MutableMicrostructure(current_best_ms_arr, use_multiphase=self.use_multiphase, trainable=False)
+            self.ms.x.assign(new_ms.x)
         else:
             self.iters_since_last_accept += 1
         self.n_iter += 1

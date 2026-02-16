@@ -299,7 +299,7 @@ class MultiStepOptimizer:
             return pickle.load(f)
 
 ##### Define the list of desired descriptors and define neccesary parameters:
-descriptor_dict = {#'Tortuosity3D':1,
+descriptor_dict = {'Tortuosity3D':1,
                     'VolumeFractions3D':1,
                 #     'TPB3D':1,
                 #     'DPB3D':1,
@@ -314,6 +314,8 @@ descriptor_weights = list(descriptor_dict.values())
 datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
 # goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy"
 goal_ms_path = '/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy'
+
+
 
 # diff_2D_optimizer = MultiStepOptimizer(full_3d=False,
 #                                       goal_ms=goal_ms_path,
@@ -360,11 +362,11 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                     #   initial_ms=result_ms,
                                       verbose=True)
 
-diff_3D_optimizer.view_goal_ms()
+# diff_3D_optimizer.view_goal_ms()
 # diff_3D_optimizer.view_initial_ms()
 diff_3D_optimizer.characterize(verbose=True)
 diff_3D_optimizer.reconstruct()
 diff_3D_optimizer.view_convergence_data()
-diff_3D_optimizer.view_result_ms()
+# diff_3D_optimizer.view_result_ms()
 diff_3D_optimizer.to_pickle()
 

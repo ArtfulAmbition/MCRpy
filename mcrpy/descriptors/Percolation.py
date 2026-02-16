@@ -253,11 +253,11 @@ class Percolation(PhaseDescriptor3D):
                 #fraction_connected_voxels_x, is_percolating_x, percolation_info_x = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 #fraction_connected_voxels.append(fraction_connected_voxels_x)
                 percolation_list.append(fraction_connected_voxels_x)
-                percolation_list.append(n_cluster)
                 percolation_list.append(fraction_largest_cluster)
                 percolation_list.append(distance_fraction_from_side_of_connected_path_x)
                 #is_percolating.append(is_percolating_x)
                 #percolation_info.append(percolation_info_x)
+            percolation_list.append(n_cluster)
 
             return percolation_list#fraction_connected_voxels, is_percolating, percolation_info
 
