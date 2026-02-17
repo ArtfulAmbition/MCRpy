@@ -252,12 +252,12 @@ class Percolation(PhaseDescriptor3D):
                 fraction_connected_voxels_x, n_cluster, fraction_largest_cluster, distance_fraction_from_side_of_connected_path_x, _, _ = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 #fraction_connected_voxels_x, is_percolating_x, percolation_info_x = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 #fraction_connected_voxels.append(fraction_connected_voxels_x)
-                percolation_list.append(fraction_connected_voxels_x)
-                percolation_list.append(fraction_largest_cluster)
+                #percolation_list.append(fraction_connected_voxels_x)
                 percolation_list.append(distance_fraction_from_side_of_connected_path_x)
                 #is_percolating.append(is_percolating_x)
                 #percolation_info.append(percolation_info_x)
-            percolation_list.append(n_cluster)
+            #percolation_list.append(n_cluster)
+            #percolation_list.append(fraction_largest_cluster)
 
             return percolation_list#fraction_connected_voxels, is_percolating, percolation_info
 
@@ -338,15 +338,32 @@ if __name__=="__main__":
     #minimal_example_ms = os.path.join(folder,'Holzer2020_Fine_Zoom0.33_Size60.npy')
     # minimal_example_ms = os.path.join(folder,'alloy_resized_s.npy')
     
-    ms = np.load(minimal_example_ms)
+    # ms = np.load(minimal_example_ms)
 
 
-    ms = np.zeros((5, 5))
-    ms[1,:] = 1
-    ms[-1,:] = 1
-    ms[1][0]=0
-    #ms = np.random.randint(low=0, high=2, size=(4, 4, 4)) 
+    # ms = np.zeros((5, 5))
+    # ms[1,:] = 1
+    # ms[-1,:] = 1
+    # ms[1][0]=0
+    # ms[]
 
+    # ms = np.zeros((3, 3, 3))
+    # ms[1,:,:] = 1
+    # ms[-1,:] = 1
+    # ms[1][0]=0
+
+
+    ms = np.random.randint(low=0, high=2, size=(10,10)) 
+    ms = np.zeros((10,10))
+    ms[1,1]=1
+    ms[1,0]=1
+    ms[1,2]=1
+    ms[2,3]=1
+    ms[3,3]=1
+    ms[1,4]=1
+    ms[0,4]=1
+
+    ms[5,0]=1
 
 
     print(f'ms:\n {ms}\n')

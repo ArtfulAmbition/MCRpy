@@ -362,22 +362,22 @@ if __name__=='__main__':
                                         is_differentiable=False,
                                         use_multigrid=False,
                                         use_multiphase=True,
-                                        info='3D_sim_anneal_4000it_perc1' + datetime_string,
+                                        info='3D_' + datetime_string,
                                         descriptor_list=desired_descriptor_list,
                                         descriptor_weights=descriptor_weights,
-                                        #optimizer="GeneticAlgorithm",
+                                        optimizer="GeneticAlgorithm",
                                         mutation_rule='RandomResetMutation',
-                                        optimizer="SimulatedAnnealing",
-                                        max_iter=4000,
-                                        population_size=20,
+                                        #optimizer="SimulatedAnnealing",
+                                        max_iter=1000,
+                                        population_size=500,
                                         #goal_ms_shape=(20,20,20),
                                         initial_ms=result_ms,
                                         verbose=True)
 
     # diff_3D_optimizer.view_goal_ms()
     # diff_3D_optimizer.view_initial_ms()
-    diff_3D_optimizer.characterize_goal_ms()
-    diff_3D_optimizer.characterize_initial_ms(verbose=True)
+    diff_3D_optimizer.characterize_goal_ms(verbose=True)
+    # diff_3D_optimizer.characterize_initial_ms(verbose=True)
     diff_3D_optimizer.reconstruct()
     diff_3D_optimizer.view_convergence_data()
     diff_3D_optimizer.view_result_ms()
