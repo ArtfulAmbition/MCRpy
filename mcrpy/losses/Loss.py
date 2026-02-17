@@ -26,6 +26,8 @@ import tensorflow as tf
 
 from mcrpy.src import loss_factory
 
+tf.config.run_functions_eagerly(True)
+
 
 class Loss(ABC):
     @abstractmethod

@@ -295,6 +295,7 @@ class GeneticAlgorithm(Optimizer):
             def get_lossVal(self,arr):
                 key = np.packbits(arr.flatten()).tobytes() 
                 if key in self.cache: #if individuum was calculated before return stored result
+                    print('found individuum in earlier calculation!')
                     return self.cache[key] 
                 else:
                     temp_ms = MutableMicrostructure(arr, use_multiphase=self.use_multiphase, trainable=False)
@@ -330,7 +331,7 @@ class GeneticAlgorithm(Optimizer):
         elif str(self.mutation_rule).lower() in {'randomresetmutation'}:
             self.mutation = RandomResetMutation(n_phases=self.n_phases,prob=0.1)
         else:
-            self.mutation = RandomResetMutation(n_phases=self.n_phases,prob=0.1)
+            self.mutation = RandomResetMutation(n_phases=self.n_phases,prob=0.15)
 
         self.algorithm = GA(
                 pop_size=self.population_size,

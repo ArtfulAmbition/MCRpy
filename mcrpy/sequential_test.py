@@ -304,7 +304,7 @@ descriptor_dict = {'Tortuosity3D':1,
                      'TPB3D':1,
                      'DPB3D':1,
                      'Percolation':1,
-                     #'FFTCorrelations3D':1
+                     'FFTCorrelations3D':1
                    }
 
 desired_descriptor_list = list(descriptor_dict.keys())
@@ -312,8 +312,8 @@ descriptor_weights = list(descriptor_dict.values())
 
 
 datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
-# goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy"
-goal_ms_path = '/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy'
+goal_ms_path = "/home/sobczyk/Dokumente/MCRpy/example_microstructures/Directed_3Phases_20x20x20.npy"
+#goal_ms_path = '/home/sobczyk/Dokumente/MCRpy/example_microstructures/Diag_4x4x4.npy'
 
 
 
@@ -357,9 +357,9 @@ diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
                                       optimizer="GeneticAlgorithm",
                                       mutation_rule='RandomResetMutation',
                                       #optimizer="SimulatedAnnealing",
-                                      max_iter=1000,
+                                      max_iter=100,
                                       population_size=20,
-                                      goal_ms_shape=(4,4,4),
+                                      goal_ms_shape=(20,20,20),
                                       #initial_ms=result_ms,
                                       verbose=True)
 
