@@ -23,6 +23,8 @@ from mcrpy.src.MutableMicrostructure import MutableMicrostructure
 import logging
 import warnings
 import tensorflow as tf
+import hashlib
+
 
 # Suppress warnings
 warnings.filterwarnings("ignore")
@@ -279,10 +281,13 @@ class GeneticAlgorithm(Optimizer):
         class OptimizationProblem(Problem):          
             def __init__(self,
                          call_loss, 
-                         use_multiphase
+                         use_multiphase,
+                         optimizer=None
                          ):
                 self.call_loss = call_loss
                 self.use_multiphase = use_multiphase
+                # reference to parent GeneticAlgorithm so the problem can adjust optimizer behavior
+                self.optimizer = optimizer
                 self.cache = {} #dict to save hashes of already evaluated individuals with the respective loss
                 super().__init__(n_var=n_elements, # the number of variables for optimization problem is the size of the microstructure.
                                 n_obj=1, # number of objective functions to be minimized 
@@ -293,9 +298,24 @@ class GeneticAlgorithm(Optimizer):
 
 
             def get_lossVal(self,arr):
-                key = np.packbits(arr.flatten()).tobytes() 
+                key = hashlib.md5(arr)
                 if key in self.cache: #if individuum was calculated before return stored result
                     print('found individuum in earlier calculation!')
+                    # bump mutation probability by +0.1 on duplicate detection (cap at 1.0)
+                    try:
+                        opt = getattr(self, "optimizer", None)
+                        if opt is not None and hasattr(opt, "mutation"):
+                            mut = opt.mutation
+                            if hasattr(mut, "prob"):
+                                old_prob = float(getattr(mut, "prob"))
+                                new_prob = min(1.0, old_prob + 0.01)
+                                print(f'new mutation rate: {new_prob}')
+                                setattr(mut, "prob", new_prob)
+                                if rank == 0:
+                                    logging.info(f"duplicate detected — increased mutation.prob {old_prob:.2f} -> {new_prob:.2f}")
+                    except Exception as _e:
+                        if rank == 0:
+                            logging.debug(f"Could not adjust mutation rate: {_e}")
                     return self.cache[key] 
                 else:
                     temp_ms = MutableMicrostructure(arr, use_multiphase=self.use_multiphase, trainable=False)
@@ -312,13 +332,14 @@ class GeneticAlgorithm(Optimizer):
                     except Exception as e:
                         logging.debug(f'Error evaluating candidate: {e}')
                         loss_val = np.inf
-                        raise ValueError
+                        #raise ValueError
                     fitness.append(loss_val)
                 out['F'] = np.array(fitness).reshape(-1,1)
 
         self.problem = OptimizationProblem(          
             call_loss=self.call_loss,
-            use_multiphase=self.use_multiphase
+            use_multiphase=self.use_multiphase,
+            optimizer=self
             )
 
         self.sampling=DiverseRandomSampling(initial_ms=self.ms)
