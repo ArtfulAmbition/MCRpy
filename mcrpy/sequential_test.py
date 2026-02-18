@@ -309,10 +309,10 @@ class MultiStepOptimizer:
 if __name__=='__main__':
 
     ##### Define the list of desired descriptors and define neccesary parameters:
-    descriptor_dict = {#'Tortuosity3D':1/3,
+    descriptor_dict = {'Tortuosity3D':1/3,
                         'VolumeFractions3D':1,
                         #'TPB3D':1,
-                        #'DPB3D':1,
+                        'DPB3D':1,
                         'Percolation':1,
                         #'FFTCorrelations3D':1/(2*8-1)**3
                     }
@@ -365,9 +365,9 @@ if __name__=='__main__':
                                         info='3D_' + datetime_string,
                                         descriptor_list=desired_descriptor_list,
                                         descriptor_weights=descriptor_weights,
-                                        optimizer="GeneticAlgorithm",
+                                        #optimizer="GeneticAlgorithm",
                                         mutation_rule='RandomResetMutation',
-                                        #optimizer="SimulatedAnnealing",
+                                        optimizer="SimulatedAnnealing",
                                         max_iter=1000,
                                         population_size=500,
                                         #goal_ms_shape=(20,20,20),

@@ -415,7 +415,7 @@ class GeneticAlgorithm(Optimizer):
                 logging_level=logging.INFO,
                 limit_to=self.limit_to,
                 )
-            characterization = mcrpy.characterize(ms, char_settings)
+            characterization = mcrpy.characterize(self.ms, char_settings)
             descriptor_list= [descriptor_str for descriptor_str in characterization.keys() if descriptor_str not in ['settings','FFTCorrelations3D']]
             for descriptor in descriptor_list:
                 print(f'{descriptor}: {list(np.reshape(characterization[descriptor],characterization[descriptor].size))}')

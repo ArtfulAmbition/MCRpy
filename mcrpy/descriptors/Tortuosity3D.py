@@ -372,8 +372,6 @@ class Tortuosity(PhaseDescriptor3D):
 
             if method == 'medial_axis':
 
-                def rotate3d_90_degrees(array3d, axis:int, k=1): #axis: 0=x, 1=y, 2=z
-                    assert len(array3d.shape)==3
                 def perform_directional_medial_axis(bool_array):
                     # using SimpleITK.
                     # It can be shown, that this computatation is dependent on the axes of the array.  
@@ -471,6 +469,9 @@ class Tortuosity(PhaseDescriptor3D):
                     else:  # already a plain 3D array with channels at the end
                         desired_shape = tuple(ms.shape[0:-1])
                     ms = tf.reshape(ms, desired_shape).numpy()
+
+                
+            
 
             if isinstance(phase_of_interest, int):
                 phase_of_interest_list = [phase_of_interest]
