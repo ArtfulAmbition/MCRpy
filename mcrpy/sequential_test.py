@@ -41,6 +41,7 @@ class MultiStepOptimizer:
                  characterization_goal:dict = None,
                  full_3d:bool=True,
                  max_iter:int = 100,
+                 conv_iter:int = 500,
                  population_size = 100,
                  is_differentiable:bool=False,
                  n_phases=3,
@@ -63,6 +64,7 @@ class MultiStepOptimizer:
         self.tolerance = tolerance
         self.population_size = population_size
         self.max_iter = max_iter
+        self.conv_iter=conv_iter
         self.datetime_string = ('{:%Y-%m-%d_%H:%M:%S}'.format(datetime.datetime.now()))
         self.is_differentiable=is_differentiable
         self.full_3d = full_3d
@@ -171,6 +173,7 @@ class MultiStepOptimizer:
             descriptor_weights=self.descriptor_weights,
             use_multiphase=self.use_multiphase, 
             max_iter=self.max_iter,
+            conv_iter=self.conv_iter,
             full_3d=self.full_3d,
             limit_to=8,
             convergence_data_steps=1, outfile_data_steps=20,
@@ -309,10 +312,10 @@ class MultiStepOptimizer:
 if __name__=='__main__':
 
     ##### Define the list of desired descriptors and define neccesary parameters:
-    descriptor_dict = {'Tortuosity3D':1/3,
+    descriptor_dict = {#'Tortuosity3D':1/3,
                         'VolumeFractions3D':1,
                         #'TPB3D':1,
-                        'DPB3D':1,
+                        #'DPB3D':1,
                         'Percolation':1,
                         #'FFTCorrelations3D':1/(2*8-1)**3
                     }
@@ -355,10 +358,15 @@ if __name__=='__main__':
     result_ms = myoptimizer.result_ms
 
 
+    goal_arr = np.zeros((4,4,4))
+    goal_arr[:,1,2] = 1
+    goal_arr[:,3,2] = 2
+    goal_ms = Microstructure(goal_arr,use_multiphase=True)
+
     ###########
 
     diff_3D_optimizer = MultiStepOptimizer(full_3d=True,
-                                        goal_ms=goal_ms_path,
+                                        goal_ms=goal_ms,
                                         is_differentiable=False,
                                         use_multigrid=False,
                                         use_multiphase=True,
@@ -368,10 +376,12 @@ if __name__=='__main__':
                                         #optimizer="GeneticAlgorithm",
                                         mutation_rule='RandomResetMutation',
                                         optimizer="SimulatedAnnealing",
-                                        max_iter=1000,
-                                        population_size=500,
-                                        #goal_ms_shape=(20,20,20),
-                                        initial_ms=result_ms,
+                                        max_iter=10000,
+                                        conv_iter=np.inf,
+                                        tolerance=1e-10,
+                                        population_size=2,
+                                        goal_ms_shape=(4,4,4),
+                                        # initial_ms=result_ms,
                                         verbose=True)
 
     # diff_3D_optimizer.view_goal_ms()

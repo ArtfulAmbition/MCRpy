@@ -370,6 +370,7 @@ class GeneticAlgorithm(Optimizer):
     def optimize(self, ms: MutableMicrostructure, restart_from_niter: int = None):
         """Optimization loop."""
 
+        
         self.n_iter = 0 if restart_from_niter is None else restart_from_niter
         self.iters_since_last_accept = 0
         self.ms = ms
@@ -459,9 +460,6 @@ class GeneticAlgorithm(Optimizer):
         self.n_iter += 1
         self.reconstruction_callback(self.n_iter, self.current_loss, self.ms)
         return
-
-    # def _mutate(self):
-    #     pass
 
 def register() -> None:
     from mcrpy.src import optimizer_factory

@@ -51,6 +51,7 @@ class DescriptorSettings:
 @dataclass
 class OptimizerSettings:
     optimizer_type: str = 'LBFGSB'
+    conv_iter: int = 500
     learning_rate: float = 0.01
     beta_1: float = 0.9
     beta_2: float = 0.999

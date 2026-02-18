@@ -166,7 +166,9 @@ class Percolation(PhaseDescriptor3D):
 
             n_isolated_voxels, n_unknown_voxels = get_number_of_isolated_and_unknown_voxels(labeled_ms, labels_at_both_surface_and_target, n_labels)
            
-            distance_fraction_from_side_of_connected_path = calculate_max_distance_fraction_in_direction(labeled_ms=labeled_ms, direction=direction,n_labels=n_labels)
+            distance_fraction_from_side_of_connected_path = calculate_max_distance_fraction_in_direction(labeled_ms=labeled_ms, direction=direction)
+
+            length_fraction_of_longest_cluster = calculate_max_length_fraction_of_largest_cluster_in_direction(labeled_ms=labeled_ms, direction=direction)
 
             # Find and count the voxels of phases which are not of interest
             n_voxels_not_of_interest = np.count_nonzero(labeled_ms==0)
@@ -188,16 +190,9 @@ class Percolation(PhaseDescriptor3D):
 
             is_percolating:np.bool_ = (fraction_connected_voxels > 0)
 
-            return fraction_connected_voxels, n_cluster, fraction_largest_cluster, distance_fraction_from_side_of_connected_path, is_percolating, percolation_info_dict
+            return length_fraction_of_longest_cluster, fraction_connected_voxels, n_cluster, fraction_largest_cluster, distance_fraction_from_side_of_connected_path, is_percolating, percolation_info_dict
             
-        def calculate_max_distance_fraction_in_direction(labeled_ms, direction:int, n_labels:int):
-            # returns the length in the specified direction of a connected path starting from the respective side 
-            
-            # if not n_labels:
-            #      n_labels=max(np.unique(labeled_ms))
-            #      if n_labels==0:
-            #           raise ValueError('no labels found')
-            
+        def calculate_max_distance_fraction_in_direction(labeled_ms, direction:int):           
             dimensionality = len(labeled_ms.shape)
             assert dimensionality in [2,3] # only 2 and 3D microstructures
             if dimensionality == 2:
@@ -221,7 +216,6 @@ class Percolation(PhaseDescriptor3D):
             # Exclude the zero from source- and target_node_labels, since zero represents phases which are not of interest
             source_node_labels = source_node_labels[source_node_labels != 0]
             
-            
             #Check which labels are present at the source and the target surface / edge
             
             # print(labeled_ms)
@@ -242,6 +236,55 @@ class Percolation(PhaseDescriptor3D):
 
             return lx/length_ms
 
+        def calculate_max_length_fraction_of_largest_cluster_in_direction(labeled_ms, direction:int):
+            dimensionality = labeled_ms.ndim
+            assert dimensionality in [2,3] # only 2 and 3D microstructures
+            if dimensionality == 2:
+                if direction not in (0, 1):
+                    raise ValueError("direction must be 0 or 1 for 2D microstructures")
+            else:  # dimensionality == 3
+                if direction not in (0, 1, 2):
+                    raise ValueError("direction must be 0, 1 or 2 for 3D microstructures")
+                
+            labels, counts = np.unique(labeled_ms, return_counts=True)
+            # Exclude the zero from source- and target_node_labels, since zero represents phases which are not of interest
+            bool_mask = labels!=0
+            labels = labels[bool_mask]
+            counts=counts[bool_mask]
+
+            if len(counts)==0:
+                return 0.0
+            
+            largest_cluster_label = labels[np.argmax(counts)]
+
+            # Generate the appropriate slices based on dimensionality and direction
+            slices_source = [slice(None)] * dimensionality  # Initialize a list of slices
+            slices_target = [slice(None)] * dimensionality  # Initialize a list of slices
+       
+            length_ms = labeled_ms.shape[direction]
+
+            target_slice_no = None
+            source_slice_no = None
+            
+            #search for largest_cluster_label forwards in the array and assign source_slice_no
+            for ii in range(length_ms):
+                 slice_idx = ii
+                 slices_source[direction] = slice_idx 
+                 if largest_cluster_label in labeled_ms[tuple(slices_source)]:
+                      source_slice_no = slice_idx
+                      break
+
+            #search for largest_cluster_label backwards in the array and assign target_slice_no
+            for ii in range(length_ms,0,-1):
+                 slice_idx = ii-1
+                 slices_target[direction] = slice_idx 
+                 if largest_cluster_label in labeled_ms[tuple(slices_target)]:
+                      target_slice_no = slice_idx
+                      break
+ 
+            lx = target_slice_no - source_slice_no + 1
+            return lx/length_ms
+
         def calculate_percolation_multidirection(ms_phase_of_interest: NDArray[np.bool_], directions:list):
              
             #fraction_connected_voxels = []
@@ -249,11 +292,12 @@ class Percolation(PhaseDescriptor3D):
             #is_percolating = []
             #percolation_info = []
             for direction in directions:
-                fraction_connected_voxels_x, n_cluster, fraction_largest_cluster, distance_fraction_from_side_of_connected_path_x, _, _ = calculate_percolation_single_direction(ms_phase_of_interest, direction)
+                length_fraction_of_longest_cluster, fraction_connected_voxels_x, n_cluster, fraction_largest_cluster, distance_fraction_from_side_of_connected_path_x, _, _ = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 #fraction_connected_voxels_x, is_percolating_x, percolation_info_x = calculate_percolation_single_direction(ms_phase_of_interest, direction)
                 #fraction_connected_voxels.append(fraction_connected_voxels_x)
                 #percolation_list.append(fraction_connected_voxels_x)
-                percolation_list.append(distance_fraction_from_side_of_connected_path_x)
+                # percolation_list.append(distance_fraction_from_side_of_connected_path_x)
+                percolation_list.append(length_fraction_of_longest_cluster)
                 #is_percolating.append(is_percolating_x)
                 #percolation_info.append(percolation_info_x)
             #percolation_list.append(n_cluster)
